@@ -9,6 +9,15 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import DashboardListings from "./pages/DashboardListings";
+import DashboardTransactions from "./pages/DashboardTransactions";
+import DashboardSwaps from "./pages/DashboardSwaps";
+import DashboardOrders from "./pages/DashboardOrders";
+import DashboardRewards from "./pages/DashboardRewards";
+import DashboardImpact from "./pages/DashboardImpact";
+import DashboardProfile from "./pages/DashboardProfile";
+import DashboardNotifications from "./pages/DashboardNotifications";
+import DashboardSettings from "./pages/DashboardSettings";
 import Admin from "./pages/Admin";
 import AdminProfile from "./pages/AdminProfile";
 import AdminSettings from "./pages/AdminSettings";
@@ -57,6 +66,15 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard/listings" element={<DashboardListings />} />
+          <Route path="/dashboard/transactions" element={<DashboardTransactions />} />
+          <Route path="/dashboard/swaps" element={<DashboardSwaps />} />
+          <Route path="/dashboard/orders" element={<DashboardOrders />} />
+          <Route path="/dashboard/rewards" element={<DashboardRewards />} />
+          <Route path="/dashboard/impact" element={<DashboardImpact />} />
+          <Route path="/dashboard/profile" element={<DashboardProfile />} />
+          <Route path="/dashboard/notifications" element={<DashboardNotifications />} />
+          <Route path="/dashboard/settings" element={<DashboardSettings />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/profile" element={<AdminProfile />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
