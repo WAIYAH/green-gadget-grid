@@ -612,6 +612,11 @@ const Swap = () => {
   };
 
   const handleSwap = (item: SwapItem) => {
+    if (!isAuthenticated) {
+      toast.info("Please log in to swap items");
+      navigate("/login");
+      return;
+    }
     setSelectedItem(item);
     setPaymentMethod("points");
     setIsDialogOpen(true);
