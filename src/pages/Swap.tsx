@@ -777,30 +777,44 @@ const Swap = () => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-14 gap-4 overflow-x-auto">
             <div className="flex items-center gap-6 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <Award className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground leading-none">Balance</p>
-                  <p className="text-sm font-bold text-foreground">
-                    <AnimatedCounter value={userPoints} suffix=" pts" />
+              {isAuthenticated ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                      <Award className="w-4 h-4 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground leading-none">Balance</p>
+                      <p className="text-sm font-bold text-foreground">
+                        <AnimatedCounter value={userPoints} suffix=" pts" />
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-px h-6 bg-border/30" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground leading-none">Spent</p>
+                      <p className="text-sm font-bold text-foreground">{pointsSpent.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                    <Award className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">
+                    Sign in to start swapping with points
                   </p>
                 </div>
-              </div>
-              <div className="w-px h-6 bg-border/30" />
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-accent" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground leading-none">Spent</p>
-                  <p className="text-sm font-bold text-foreground">{pointsSpent.toLocaleString()}</p>
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">
+
               {compareList.length > 0 && (
                 <Button
                   size="sm"
