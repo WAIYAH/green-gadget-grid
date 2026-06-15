@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence, useInView, useMotionValue, useTransform } from "framer-motion";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -571,6 +572,8 @@ const ComparisonModal = ({
 
 // --- Main Page ---
 const Swap = () => {
+  const navigate = useNavigate();
+  const isAuthenticated = typeof window !== "undefined" && localStorage.getItem("isAuthenticated") === "true";
   const [userPoints, setUserPoints] = useState(7250);
   const [pointsSpent] = useState(4600);
   const [searchQuery, setSearchQuery] = useState("");
@@ -609,6 +612,11 @@ const Swap = () => {
   };
 
   const handleSwap = (item: SwapItem) => {
+    if (!isAuthenticated) {
+      toast.info("Please log in to swap items");
+      navigate("/login");
+      return;
+    }
     setSelectedItem(item);
     setPaymentMethod("points");
     setIsDialogOpen(true);
@@ -769,30 +777,44 @@ const Swap = () => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-14 gap-4 overflow-x-auto">
             <div className="flex items-center gap-6 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <Award className="w-4 h-4 text-primary-foreground" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground leading-none">Balance</p>
-                  <p className="text-sm font-bold text-foreground">
-                    <AnimatedCounter value={userPoints} suffix=" pts" />
+              {isAuthenticated ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                      <Award className="w-4 h-4 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground leading-none">Balance</p>
+                      <p className="text-sm font-bold text-foreground">
+                        <AnimatedCounter value={userPoints} suffix=" pts" />
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-px h-6 bg-border/30" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground leading-none">Spent</p>
+                      <p className="text-sm font-bold text-foreground">{pointsSpent.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                    <Award className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground">
+                    Sign in to start swapping with points
                   </p>
                 </div>
-              </div>
-              <div className="w-px h-6 bg-border/30" />
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-                  <TrendingUp className="w-4 h-4 text-accent" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground leading-none">Spent</p>
-                  <p className="text-sm font-bold text-foreground">{pointsSpent.toLocaleString()}</p>
-                </div>
-              </div>
+              )}
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">
+
               {compareList.length > 0 && (
                 <Button
                   size="sm"
@@ -959,52 +981,54 @@ const Swap = () => {
                 </motion.div>
               )}
 
-              {/* Transaction History */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="mt-16"
-              >
-                <h2 className="text-2xl font-bold mb-6 text-foreground">Recent Transactions</h2>
-                <div className="rounded-2xl glass-lg glass-border-gradient overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-border/20">
-                          <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Item</th>
-                          <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost</th>
-                          <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
-                          <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {mockTransactions.map((t, i) => (
-                          <motion.tr
-                            key={t.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.4 + i * 0.1 }}
-                            className="border-b border-border/10 hover:bg-muted/20 transition-colors"
-                          >
-                            <td className="py-3 px-5 text-sm font-medium text-foreground">{t.itemName}</td>
-                            <td className="py-3 px-5 text-sm text-primary font-semibold">
-                              {t.pointsUsed > 0 ? `${t.pointsUsed.toLocaleString()} pts` : `$${t.cashUsed}`}
-                            </td>
-                            <td className="py-3 px-5 text-sm text-muted-foreground">{new Date(t.date).toLocaleDateString()}</td>
-                            <td className="py-3 px-5">
-                              <Badge className={`text-xs ${t.status === "Completed" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
-                                {t.status === "Completed" && <Check className="w-3 h-3 mr-1" />}
-                                {t.status}
-                              </Badge>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {/* Transaction History - only for authenticated users */}
+              {isAuthenticated && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="mt-16"
+                >
+                  <h2 className="text-2xl font-bold mb-6 text-foreground">Recent Transactions</h2>
+                  <div className="rounded-2xl glass-lg glass-border-gradient overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-border/20">
+                            <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Item</th>
+                            <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost</th>
+                            <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                            <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {mockTransactions.map((t, i) => (
+                            <motion.tr
+                              key={t.id}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: 0.4 + i * 0.1 }}
+                              className="border-b border-border/10 hover:bg-muted/20 transition-colors"
+                            >
+                              <td className="py-3 px-5 text-sm font-medium text-foreground">{t.itemName}</td>
+                              <td className="py-3 px-5 text-sm text-primary font-semibold">
+                                {t.pointsUsed > 0 ? `${t.pointsUsed.toLocaleString()} pts` : `$${t.cashUsed}`}
+                              </td>
+                              <td className="py-3 px-5 text-sm text-muted-foreground">{new Date(t.date).toLocaleDateString()}</td>
+                              <td className="py-3 px-5">
+                                <Badge className={`text-xs ${t.status === "Completed" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
+                                  {t.status === "Completed" && <Check className="w-3 h-3 mr-1" />}
+                                  {t.status}
+                                </Badge>
+                              </td>
+                            </motion.tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
+                </motion.div>
+              )}
             </div>
           </div>
         </div>
