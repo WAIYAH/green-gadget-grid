@@ -6,6 +6,7 @@ import {
   Package, UserCircle, Bell, Settings, ChevronLeft, Plus, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface NavItem {
   label: string;
@@ -56,9 +57,9 @@ const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
   const toggleSection = (title: string) =>
     setExpanded((p) => (p.includes(title) ? p.filter((t) => t !== title) : [...p, title]));
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("userRole");
+  const { signOut } = useAuth();
+  const handleLogout = async () => {
+    await signOut();
     navigate("/login");
   };
 
