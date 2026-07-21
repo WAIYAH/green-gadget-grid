@@ -5,6 +5,7 @@ import { LayoutDashboard, Smartphone, ArrowLeftRight, UserCircle } from "lucide-
 import { cn } from "@/lib/utils";
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   children: React.ReactNode;
@@ -22,12 +23,13 @@ const MOBILE_NAV = [
 const DashboardLayout = ({ children, title, breadcrumbs }: Props) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, loading } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem("isAuthenticated") !== "true") navigate("/login");
-  }, [navigate]);
+    if (!loading && !user) navigate("/login");
+  }, [loading, user, navigate]);
 
   const defaultCrumbs = [{ label: "Dashboard", path: "/dashboard" }, { label: title }];
 

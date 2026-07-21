@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import AdminSidebar from "./AdminSidebar";
 import AdminHeader from "./AdminHeader";
 import AdminSearchModal from "./AdminSearchModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -23,19 +24,17 @@ const MOBILE_NAV = [
 const AdminLayout = ({ children, title, breadcrumbs }: AdminLayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, role, loading } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [showFab, setShowFab] = useState(false);
 
-  // Auth check
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem("isAuthenticated");
-    const userRole = localStorage.getItem("userRole");
-    if (!isAuthenticated || userRole !== "admin") {
-      navigate("/login");
-    }
-  }, [navigate]);
+    if (loading) return;
+    if (!user) navigate("/login");
+    else if (role && role !== "admin") navigate("/dashboard");
+  }, [loading, user, role, navigate]);
 
   // Cmd+K
   useEffect(() => {
