@@ -573,7 +573,8 @@ const ComparisonModal = ({
 // --- Main Page ---
 const Swap = () => {
   const navigate = useNavigate();
-  const isAuthenticated = typeof window !== "undefined" && localStorage.getItem("isAuthenticated") === "true";
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
   const [userPoints, setUserPoints] = useState(7250);
   const [pointsSpent] = useState(4600);
   const [searchQuery, setSearchQuery] = useState("");
