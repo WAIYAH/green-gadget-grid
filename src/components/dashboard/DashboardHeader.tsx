@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Menu, Search, Coins, ChevronDown, User, Settings, LogOut, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Props {
   breadcrumbs: { label: string; path?: string }[];
@@ -18,6 +19,7 @@ const NOTIFICATIONS = [
 
 const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -33,9 +35,8 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("userRole");
+  const handleLogout = async () => {
+    await signOut();
     navigate("/login");
   };
 
