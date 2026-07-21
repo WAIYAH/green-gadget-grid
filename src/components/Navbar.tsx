@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Leaf, Menu, X, Coins, User, Home, ArrowLeftRight, BookOpen, Info, LayoutDashboard, Shield } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const NAV_LINKS = [
   { to: "/", label: "Home", icon: Home },
@@ -20,22 +22,23 @@ const Navbar = () => {
   const lastScrollY = useRef(0);
   const navigate = useNavigate();
   const location = useLocation();
-  const isAuthenticated = localStorage.getItem("isAuthenticated") === "true";
-  const userRole = localStorage.getItem("userRole") || "user";
+  const { user, role, signOut } = useAuth();
+  const isAuthenticated = !!user;
+  const userRole = role || "user";
 
-  // Animated points counter
-  const targetPoints = 2450;
   useEffect(() => {
-    if (!isAuthenticated) return;
-    let current = 0;
-    const step = Math.ceil(targetPoints / 40);
-    const interval = setInterval(() => {
-      current = Math.min(current + step, targetPoints);
-      setPoints(current);
-      if (current >= targetPoints) clearInterval(interval);
-    }, 30);
-    return () => clearInterval(interval);
-  }, [isAuthenticated]);
+    if (!user) { setPoints(0); return; }
+    supabase.from("profiles").select("points").eq("id", user.id).maybeSingle().then(({ data }) => {
+      const target = data?.points ?? 0;
+      let current = 0;
+      const step = Math.max(1, Math.ceil(target / 40));
+      const interval = setInterval(() => {
+        current = Math.min(current + step, target);
+        setPoints(current);
+        if (current >= target) clearInterval(interval);
+      }, 30);
+    });
+  }, [user]);
 
   const handleScroll = useCallback(() => {
     const currentY = window.scrollY;
@@ -55,9 +58,8 @@ const Navbar = () => {
   // Close mobile menu on route change
   useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAuthenticated");
-    localStorage.removeItem("userRole");
+  const handleLogout = async () => {
+    await signOut();
     navigate("/login");
   };
 

@@ -45,6 +45,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 // --- Types ---
 interface SwapItem {
@@ -573,7 +574,8 @@ const ComparisonModal = ({
 // --- Main Page ---
 const Swap = () => {
   const navigate = useNavigate();
-  const isAuthenticated = typeof window !== "undefined" && localStorage.getItem("isAuthenticated") === "true";
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
   const [userPoints, setUserPoints] = useState(7250);
   const [pointsSpent] = useState(4600);
   const [searchQuery, setSearchQuery] = useState("");

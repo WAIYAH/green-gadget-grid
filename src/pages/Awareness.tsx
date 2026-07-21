@@ -60,6 +60,7 @@ import {
   X,
 } from "lucide-react";
 import { AwarenessProvider, useAwareness, ContentItem } from "@/contexts/AwarenessContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -676,7 +677,8 @@ const AwarenessContent = () => {
   const contentRef = useRef<HTMLDivElement>(null);
   const articleContentRef = useRef<HTMLDivElement>(null);
 
-  const isAdmin = localStorage.getItem("userRole") === "admin";
+  const { role } = useAuth();
+  const isAdmin = role === "admin";
 
   const [formData, setFormData] = useState({
     type: "article" as ContentItem["type"],

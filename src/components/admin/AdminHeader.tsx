@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AdminHeaderProps {
   breadcrumbs: { label: string; path?: string }[];
@@ -38,6 +39,7 @@ type AdminStatus = "online" | "away" | "busy";
 
 const AdminHeader = ({ breadcrumbs, onMenuToggle }: AdminHeaderProps) => {
   const navigate = useNavigate();
+  const { signOut } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showTimezone, setShowTimezone] = useState(false);
@@ -266,9 +268,8 @@ const AdminHeader = ({ breadcrumbs, onMenuToggle }: AdminHeaderProps) => {
                     <Settings className="w-4 h-4" /> Settings
                   </button>
                   <button
-                    onClick={() => {
-                      localStorage.removeItem("isAuthenticated");
-                      localStorage.removeItem("userRole");
+                    onClick={async () => {
+                      await signOut();
                       navigate("/login");
                     }}
                     className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-destructive hover:bg-destructive/10 transition-colors"
