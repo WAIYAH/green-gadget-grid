@@ -22,6 +22,8 @@ import DashboardSwaps from "./pages/DashboardSwaps";
 import DashboardOrders from "./pages/DashboardOrders";
 import DashboardRewards from "./pages/DashboardRewards";
 import DashboardImpact from "./pages/DashboardImpact";
+import DashboardLearning from "./pages/DashboardLearning";
+import DashboardLearningDetail from "./pages/DashboardLearningDetail";
 import DashboardProfile from "./pages/DashboardProfile";
 import DashboardNotifications from "./pages/DashboardNotifications";
 import DashboardSettings from "./pages/DashboardSettings";
@@ -85,6 +87,8 @@ const App = () => (
             <Route path="/dashboard/orders" element={<DashboardOrders />} />
             <Route path="/dashboard/rewards" element={<DashboardRewards />} />
             <Route path="/dashboard/impact" element={<DashboardImpact />} />
+            <Route path="/dashboard/learning" element={<DashboardLearning />} />
+            <Route path="/dashboard/learning/:id" element={<DashboardLearningDetail />} />
             <Route path="/dashboard/profile" element={<DashboardProfile />} />
             <Route path="/dashboard/notifications" element={<DashboardNotifications />} />
             <Route path="/dashboard/settings" element={<DashboardSettings />} />

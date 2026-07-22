@@ -10,13 +10,16 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FileText, Plus, Search, Edit, Trash2, Eye, TrendingUp, Clock,
-  CheckCircle2, FileEdit, Archive, Calendar, Tag,
+  CheckCircle2, FileEdit, Archive, Calendar, Tag, GraduationCap, X,
 } from "lucide-react";
-import { useAwareness, ContentItem, AwarenessProvider } from "@/contexts/AwarenessContext";
+import { useAwareness, ContentItem, QuizQuestion, AwarenessProvider } from "@/contexts/AwarenessContext";
 import { toast } from "sonner";
+
+const emptyQuestion = (): QuizQuestion => ({ question: "", options: ["", "", "", ""], correct: 0 });
 
 const CATEGORIES = [
   "Sustainability 101", "Recycle Tips", "Tech & Environment",
@@ -40,6 +43,7 @@ const AdminArticles = () => {
   const [form, setForm] = useState({
     title: "", category: CATEGORIES[0], description: "", content: "",
     author: "", type: "article" as ContentItem["type"], thumbnail: "/placeholder.svg",
+    quizQuestions: [] as QuizQuestion[], quizPoints: 20,
   });
 
   const filtered = content.filter((c) => {
@@ -53,6 +57,7 @@ const AdminArticles = () => {
     setForm({
       title: "", category: CATEGORIES[0], description: "", content: "",
       author: "", type: "article", thumbnail: "/placeholder.svg",
+      quizQuestions: [], quizPoints: 20,
     });
     setOpen(true);
   };
@@ -63,6 +68,7 @@ const AdminArticles = () => {
       title: item.title, category: item.category, description: item.description,
       content: item.content || "", author: item.author, type: item.type,
       thumbnail: item.thumbnail,
+      quizQuestions: item.quizQuestions || [], quizPoints: item.quizPoints ?? 20,
     });
     setOpen(true);
   };
@@ -71,6 +77,12 @@ const AdminArticles = () => {
     if (!form.title || !form.author) {
       toast.error("Title and author are required");
       return;
+    }
+    for (const q of form.quizQuestions) {
+      if (!q.question.trim() || q.options.some((o) => !o.trim())) {
+        toast.error("Every quiz question needs text and all four options filled in");
+        return;
+      }
     }
     setSaving(true);
     if (editing) {
@@ -83,6 +95,16 @@ const AdminArticles = () => {
     setSaving(false);
     setOpen(false);
   };
+
+  const addQuestion = () => setForm((p) => ({ ...p, quizQuestions: [...p.quizQuestions, emptyQuestion()] }));
+  const removeQuestion = (i: number) => setForm((p) => ({ ...p, quizQuestions: p.quizQuestions.filter((_, idx) => idx !== i) }));
+  const updateQuestion = (i: number, patch: Partial<QuizQuestion>) =>
+    setForm((p) => ({ ...p, quizQuestions: p.quizQuestions.map((q, idx) => (idx === i ? { ...q, ...patch } : q)) }));
+  const updateOption = (qi: number, oi: number, value: string) =>
+    setForm((p) => ({
+      ...p,
+      quizQuestions: p.quizQuestions.map((q, idx) => (idx === qi ? { ...q, options: q.options.map((o, oidx) => (oidx === oi ? value : o)) } : q)),
+    }));
 
   const remove = async (id: string) => {
     await deleteContent(id);
@@ -165,9 +187,14 @@ const AdminArticles = () => {
                         <Card className="p-4 glass-hover h-full flex flex-col">
                           <div className="flex items-start justify-between gap-2 mb-3">
                             <Badge variant="outline" className="text-[10px] uppercase">{item.type}</Badge>
-                            {item.featured && (
-                              <Badge className="bg-accent/20 text-accent border-0 text-[10px]">Featured</Badge>
-                            )}
+                            <div className="flex gap-1">
+                              {item.quizQuestions && item.quizQuestions.length > 0 && (
+                                <Badge className="bg-primary/15 text-primary border-0 gap-1 text-[10px]"><GraduationCap className="w-3 h-3" />Quiz</Badge>
+                              )}
+                              {item.featured && (
+                                <Badge className="bg-accent/20 text-accent border-0 text-[10px]">Featured</Badge>
+                              )}
+                            </div>
                           </div>
                           <h4 className="font-bold text-foreground mb-2 line-clamp-2">{item.title}</h4>
                           <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{item.description}</p>
@@ -249,6 +276,65 @@ const AdminArticles = () => {
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Content</label>
               <Textarea rows={6} value={form.content} onChange={(e) => setForm({ ...form, content: e.target.value })} />
+            </div>
+
+            <div className="border-t border-border/50 pt-4">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm font-semibold text-foreground flex items-center gap-1.5"><GraduationCap className="w-4 h-4 text-primary" /> Learning Center Quiz (optional)</label>
+                <Button type="button" size="sm" variant="outline" onClick={addQuestion} className="gap-1"><Plus className="w-3 h-3" /> Add Question</Button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Add questions to make this a quiz-gated module in the user Learning Center. Users need 70% to pass and earn points.
+              </p>
+
+              {form.quizQuestions.length > 0 && (
+                <div className="mb-3">
+                  <label className="text-xs text-muted-foreground mb-1 block">Points reward on pass</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="w-32"
+                    value={form.quizPoints}
+                    onChange={(e) => setForm({ ...form, quizPoints: Number(e.target.value) || 0 })}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {form.quizQuestions.map((q, qi) => (
+                  <Card key={qi} className="p-3 bg-muted/20 border-border/30">
+                    <div className="flex items-start gap-2 mb-2">
+                      <Input
+                        placeholder={`Question ${qi + 1}`}
+                        value={q.question}
+                        onChange={(e) => updateQuestion(qi, { question: e.target.value })}
+                        className="flex-1"
+                      />
+                      <Button type="button" size="icon" variant="ghost" className="shrink-0 text-destructive" onClick={() => removeQuestion(qi)}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mb-1.5">Select the correct answer:</p>
+                    <RadioGroup
+                      value={q.correct.toString()}
+                      onValueChange={(v) => updateQuestion(qi, { correct: Number(v) })}
+                      className="space-y-1.5"
+                    >
+                      {q.options.map((opt, oi) => (
+                        <div key={oi} className="flex items-center gap-2">
+                          <RadioGroupItem value={oi.toString()} id={`quiz-${qi}-${oi}`} />
+                          <Input
+                            placeholder={`Option ${oi + 1}`}
+                            value={opt}
+                            onChange={(e) => updateOption(qi, oi, e.target.value)}
+                            className="flex-1 h-8 text-sm"
+                          />
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </Card>
+                ))}
+              </div>
             </div>
           </div>
           <DialogFooter>

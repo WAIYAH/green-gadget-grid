@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, Leaf, Award, Smartphone, CreditCard, ArrowLeftRight,
-  Package, UserCircle, Bell, Settings, ChevronLeft, Plus, LogOut,
+  Package, UserCircle, Bell, Settings, ChevronLeft, Plus, LogOut, BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface NavItem {
   label: string;
@@ -21,6 +22,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Overview",
     items: [
       { label: "Home", icon: LayoutDashboard, path: "/dashboard" },
+      { label: "Learning Center", icon: BookOpen, path: "/dashboard/learning" },
       { label: "Impact Tracker", icon: Leaf, path: "/dashboard/impact" },
       { label: "Rewards", icon: Award, path: "/dashboard/rewards" },
     ],
@@ -28,9 +30,9 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "My Activity",
     items: [
-      { label: "My Listings", icon: Smartphone, path: "/dashboard/listings", badge: 2 },
+      { label: "My Listings", icon: Smartphone, path: "/dashboard/listings" },
       { label: "Transactions", icon: CreditCard, path: "/dashboard/transactions" },
-      { label: "Swaps", icon: ArrowLeftRight, path: "/dashboard/swaps", badge: 1 },
+      { label: "Swaps", icon: ArrowLeftRight, path: "/dashboard/swaps" },
       { label: "Orders", icon: Package, path: "/dashboard/orders" },
     ],
   },
@@ -38,7 +40,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Account",
     items: [
       { label: "Profile", icon: UserCircle, path: "/dashboard/profile" },
-      { label: "Notifications", icon: Bell, path: "/dashboard/notifications", badge: 3 },
+      { label: "Notifications", icon: Bell, path: "/dashboard/notifications" },
       { label: "Settings", icon: Settings, path: "/dashboard/settings" },
     ],
   },
@@ -49,7 +51,25 @@ interface Props { collapsed: boolean; onToggle: () => void; }
 const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [expanded, setExpanded] = useState<string[]>(NAV_SECTIONS.map((s) => s.title));
+  const [liveBadges, setLiveBadges] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("read", false),
+      supabase.from("articles").select("id, quiz_questions").not("quiz_questions", "is", null),
+      supabase.from("learning_progress").select("article_id").eq("user_id", user.id).eq("quiz_passed", true),
+    ]).then(([notifs, quizzable, completed]) => {
+      const completedIds = new Set((completed.data || []).map((r) => r.article_id));
+      const openQuizzes = (quizzable.data || []).filter((a) => !completedIds.has(a.id)).length;
+      setLiveBadges({
+        "/dashboard/notifications": notifs.count || 0,
+        "/dashboard/learning": openQuizzes,
+      });
+    });
+  }, [user]);
 
   const isActive = (path: string) =>
     path === "/dashboard" ? location.pathname === "/dashboard" : location.pathname === path;
@@ -132,6 +152,7 @@ const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
                   {section.items.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
+                    const badge = liveBadges[item.path];
                     return (
                       <motion.button
                         key={item.label}
@@ -157,9 +178,9 @@ const DashboardSidebar = ({ collapsed, onToggle }: Props) => {
                         {!collapsed && (
                           <>
                             <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
-                            {item.badge && (
+                            {!!badge && (
                               <span className="min-w-[20px] h-5 flex items-center justify-center rounded-full bg-primary/20 text-primary text-[11px] font-medium px-1.5">
-                                {item.badge}
+                                {badge}
                               </span>
                             )}
                           </>

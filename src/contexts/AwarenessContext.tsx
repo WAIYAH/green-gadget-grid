@@ -3,6 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correct: number;
+}
+
 export interface ContentItem {
   id: string;
   type: "article" | "video" | "infographic";
@@ -16,6 +22,8 @@ export interface ContentItem {
   videoUrl?: string;
   views: number;
   featured?: boolean;
+  quizQuestions?: QuizQuestion[];
+  quizPoints?: number;
 }
 
 interface AwarenessContextType {
@@ -42,6 +50,8 @@ type ArticleRow = {
   views: number;
   featured: boolean;
   created_at: string;
+  quiz_questions: unknown;
+  quiz_points: number;
 };
 
 const fromRow = (row: ArticleRow): ContentItem => ({
@@ -57,6 +67,8 @@ const fromRow = (row: ArticleRow): ContentItem => ({
   videoUrl: row.video_url || undefined,
   views: row.views,
   featured: row.featured,
+  quizQuestions: Array.isArray(row.quiz_questions) ? (row.quiz_questions as QuizQuestion[]) : undefined,
+  quizPoints: row.quiz_points,
 });
 
 export const AwarenessProvider = ({ children }: { children: ReactNode }) => {
@@ -68,7 +80,7 @@ export const AwarenessProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("articles")
-      .select("id, type, title, category, description, content, author, thumbnail, video_url, views, featured, created_at")
+      .select("id, type, title, category, description, content, author, thumbnail, video_url, views, featured, created_at, quiz_questions, quiz_points")
       .order("created_at", { ascending: false });
     if (error) {
       toast.error(error.message);
@@ -94,6 +106,8 @@ export const AwarenessProvider = ({ children }: { children: ReactNode }) => {
       featured: item.featured || false,
       published: true,
       created_by: user?.id,
+      quiz_questions: item.quizQuestions && item.quizQuestions.length > 0 ? item.quizQuestions : null,
+      quiz_points: item.quizPoints ?? 20,
     });
     if (error) { toast.error(error.message); return; }
     await load();
@@ -110,6 +124,8 @@ export const AwarenessProvider = ({ children }: { children: ReactNode }) => {
       ...(updates.thumbnail !== undefined && { thumbnail: updates.thumbnail }),
       ...(updates.videoUrl !== undefined && { video_url: updates.videoUrl }),
       ...(updates.featured !== undefined && { featured: updates.featured }),
+      ...(updates.quizQuestions !== undefined && { quiz_questions: updates.quizQuestions.length > 0 ? updates.quizQuestions : null }),
+      ...(updates.quizPoints !== undefined && { quiz_points: updates.quizPoints }),
     }).eq("id", id);
     if (error) { toast.error(error.message); return; }
     await load();
