@@ -102,6 +102,8 @@
 | **HTTP Client** | Axios |
 | **Forms** | React Hook Form + Zod |
 | **Notifications** | Sonner + Radix Toast |
+| **Backend** | Self-hosted Supabase (Postgres, GoTrue Auth, PostgREST, Storage) via Docker |
+| **Package Manager** | pnpm |
 
 ---
 
@@ -138,26 +140,63 @@ src/
 
 ## 🏁 Getting Started
 
+This project runs **100% locally**: [pnpm](https://pnpm.io) for package management and a self-hosted [Supabase](https://supabase.com) (Postgres + Auth + Storage) stack via Docker — no cloud account required.
+
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18+)
-- npm or pnpm
+- [Node.js 20+](https://nodejs.org/) (see `.nvmrc`)
+- [pnpm 9](https://pnpm.io/installation) — this repo blocks `npm`/`yarn`/`bun` via a `preinstall` guard
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running) — the Supabase CLI drives Postgres, GoTrue, PostgREST, Storage and Studio as containers
+- The [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) — already pinned as a local devDependency, no separate install needed (invoke via `pnpm exec supabase` or the `pnpm supabase:*` / `pnpm db:*` scripts below)
 
-### Installation
+### 1. Install dependencies
 
 ```bash
-# Clone the repository
-git clone <YOUR_GIT_URL>
-cd <YOUR_PROJECT_NAME>
-
-# Install dependencies
-npm install
-
-# Start the development server
-npm run dev
+pnpm install
 ```
 
-The app will be available at `http://localhost:5173`.
+### 2. Start local Supabase
+
+Make sure Docker Desktop is running, then:
+
+```bash
+pnpm supabase:start
+```
+
+First run pulls several Docker images and can take a few minutes. When it finishes, the CLI prints your local `API URL`, `anon key`, and `service_role key` — copy the `API URL` and `anon key` into `.env` (see `.env.example`):
+
+```bash
+cp .env.example .env
+# then edit .env and paste in the values printed by `pnpm supabase:start`
+```
+
+- Studio (DB browser/table editor): http://127.0.0.1:54323
+- API: http://127.0.0.1:54321
+- Inbucket (catches outgoing emails, e.g. signup confirmations): http://127.0.0.1:54324
+
+### 3. Apply migrations + seed data
+
+```bash
+pnpm db:reset
+```
+
+This drops and rebuilds the local database from every file in `supabase/migrations/`, then loads `supabase/seed.sql` (demo users, sample gadgets, articles, rewards, swap catalog, etc.). Re-run this any time you want a clean slate.
+
+### 4. Regenerate types (after any schema change)
+
+```bash
+pnpm db:types
+```
+
+Writes `src/integrations/supabase/types.ts` from the local database schema.
+
+### 5. Run the app
+
+```bash
+pnpm dev
+```
+
+The app is available at **http://localhost:8080**.
 
 ### Demo Credentials
 
@@ -166,11 +205,30 @@ The app will be available at `http://localhost:5173`.
 | Admin | `admin@tripleG.com` | `admin123` |
 | User | `user@tripleG.com` | `user123` |
 
+### Stopping
+
+```bash
+pnpm supabase:stop
+```
+
+### All available scripts
+
+| Script | Purpose |
+|---|---|
+| `pnpm dev` | Start the Vite dev server on :8080 |
+| `pnpm build` | Production build |
+| `pnpm preview` | Preview the production build |
+| `pnpm lint` | ESLint |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm supabase:start` / `pnpm supabase:stop` | Start/stop the local Supabase Docker stack |
+| `pnpm db:reset` | Re-apply all migrations + seed data |
+| `pnpm db:types` | Regenerate `src/integrations/supabase/types.ts` |
+
 ---
 
 ## 🛣️ Roadmap
 
-- [ ] Backend integration with Lovable Cloud (database, auth, storage)
+- [ ] Wire remaining Admin/Dashboard pages (Transactions, Swaps, Orders, Rewards, Impact, Notifications, Tickets, Feedback, Payouts, Announcements) to live Supabase queries — currently still client-side mock data, see note below
 - [ ] Real-time reward point tracking and transactions
 - [ ] Interactive map with geolocation for pickup centers
 - [ ] Payment gateway integration (Stripe) for cash swaps
