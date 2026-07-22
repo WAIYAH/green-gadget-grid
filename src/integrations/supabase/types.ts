@@ -87,6 +87,8 @@ export type Database = {
           featured: boolean
           id: string
           published: boolean
+          quiz_points: number
+          quiz_questions: Json | null
           thumbnail: string | null
           title: string
           type: string
@@ -104,6 +106,8 @@ export type Database = {
           featured?: boolean
           id?: string
           published?: boolean
+          quiz_points?: number
+          quiz_questions?: Json | null
           thumbnail?: string | null
           title: string
           type?: string
@@ -121,6 +125,8 @@ export type Database = {
           featured?: boolean
           id?: string
           published?: boolean
+          quiz_points?: number
+          quiz_questions?: Json | null
           thumbnail?: string | null
           title?: string
           type?: string
@@ -210,6 +216,53 @@ export type Database = {
           weight_kg?: number | null
         }
         Relationships: []
+      }
+      learning_progress: {
+        Row: {
+          article_id: string
+          completed_at: string | null
+          created_at: string
+          id: string
+          points_awarded: number
+          quiz_passed: boolean
+          quiz_score: number | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          article_id: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          points_awarded?: number
+          quiz_passed?: boolean
+          quiz_score?: number | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          article_id?: string
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          points_awarded?: number
+          quiz_passed?: boolean
+          quiz_score?: number | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_progress_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "articles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       newsletter_subscribers: {
         Row: {
@@ -357,10 +410,13 @@ export type Database = {
           bio: string | null
           co2_saved: number
           created_at: string
+          current_streak: number
           email: string | null
           full_name: string | null
           id: string
+          last_learning_date: string | null
           location: string | null
+          longest_streak: number
           phone: string | null
           points: number
           tier: string
@@ -371,10 +427,13 @@ export type Database = {
           bio?: string | null
           co2_saved?: number
           created_at?: string
+          current_streak?: number
           email?: string | null
           full_name?: string | null
           id: string
+          last_learning_date?: string | null
           location?: string | null
+          longest_streak?: number
           phone?: string | null
           points?: number
           tier?: string
@@ -385,10 +444,13 @@ export type Database = {
           bio?: string | null
           co2_saved?: number
           created_at?: string
+          current_streak?: number
           email?: string | null
           full_name?: string | null
           id?: string
+          last_learning_date?: string | null
           location?: string | null
+          longest_streak?: number
           phone?: string | null
           points?: number
           tier?: string
@@ -701,6 +763,14 @@ export type Database = {
       }
       reject_gadget: { Args: { _gadget_id: string }; Returns: undefined }
       self_delete_account: { Args: never; Returns: undefined }
+      submit_learning_quiz: {
+        Args: { _answers: number[]; _article_id: string }
+        Returns: {
+          passed: boolean
+          points_awarded: number
+          score: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"

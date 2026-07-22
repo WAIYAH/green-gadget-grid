@@ -59,6 +59,26 @@ begin
   ('article', 'Rare Earth Metals and Why They Matter', 'Education', 'The precious materials locked inside your old devices.', 'Full article content about rare earth metals...', 'Triple G Team', '/placeholder.svg', false, true, _admin_id);
 
   -- ===================================================
+  -- LEARNING CENTER QUIZZES — attach a quiz to a few seeded articles
+  -- so the Learning Center has something to demo out of the box.
+  -- ===================================================
+  update public.articles set quiz_points = 25, quiz_questions = '[
+    {"question": "What is the fastest-growing waste stream in the world?", "options": ["Plastic packaging", "Electronic waste (e-waste)", "Food waste", "Paper waste"], "correct": 1},
+    {"question": "Why shouldn''t e-waste go straight into a landfill?", "options": ["It has no value at all", "It can contain hazardous materials as well as recoverable ones", "It decomposes too quickly", "It is illegal to landfill any metal"], "correct": 1},
+    {"question": "What does recycling e-waste primarily help recover?", "options": ["Only plastic", "Recoverable materials like metals", "Nothing of value", "Only glass"], "correct": 1}
+  ]'::jsonb where title = 'Why E-Waste Recycling Matters';
+
+  update public.articles set quiz_points = 20, quiz_questions = '[
+    {"question": "Why is wiping your data important before recycling a device?", "options": ["It makes the device heavier", "It prevents your personal data from being exposed", "It voids the warranty", "It is not actually necessary"], "correct": 1},
+    {"question": "What is a reliable way to erase data before recycling?", "options": ["Just delete the files normally", "Perform a full factory reset / secure wipe", "Rename the files", "Nothing, recyclers handle it automatically"], "correct": 1}
+  ]'::jsonb where title = 'How to Wipe Your Data Before Recycling';
+
+  update public.articles set quiz_points = 20, quiz_questions = '[
+    {"question": "What happens to CO2 emissions when you recycle or swap a gadget instead of buying new?", "options": ["They increase", "They stay exactly the same", "They are reduced", "There is no connection"], "correct": 2},
+    {"question": "What besides CO2 can recycling electronics help conserve?", "options": ["Water and energy used in manufacturing new devices", "Nothing else", "Only plastic", "Only glass"], "correct": 0}
+  ]'::jsonb where title = 'Understanding CO2 Savings from Recycling';
+
+  -- ===================================================
   -- ANNOUNCEMENTS — 4+
   -- ===================================================
   insert into public.announcements (title, body, audience, pinned, published_at, created_by) values
