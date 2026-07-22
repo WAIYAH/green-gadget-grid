@@ -7,15 +7,36 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
       announcements: {
         Row: {
+          archived: boolean
           audience: string
           body: string
           created_at: string
@@ -24,9 +45,11 @@ export type Database = {
           pinned: boolean
           published_at: string | null
           title: string
+          type: string
           updated_at: string
         }
         Insert: {
+          archived?: boolean
           audience?: string
           body: string
           created_at?: string
@@ -35,9 +58,11 @@ export type Database = {
           pinned?: boolean
           published_at?: string | null
           title: string
+          type?: string
           updated_at?: string
         }
         Update: {
+          archived?: boolean
           audience?: string
           body?: string
           created_at?: string
@@ -46,6 +71,7 @@ export type Database = {
           pinned?: boolean
           published_at?: string | null
           title?: string
+          type?: string
           updated_at?: string
         }
         Relationships: []
@@ -144,7 +170,7 @@ export type Database = {
           model: string | null
           name: string
           points_value: number
-          status: string
+          status: Database["public"]["Enums"]["gadget_status"]
           updated_at: string
           user_id: string
           weight_kg: number | null
@@ -161,7 +187,7 @@ export type Database = {
           model?: string | null
           name: string
           points_value?: number
-          status?: string
+          status?: Database["public"]["Enums"]["gadget_status"]
           updated_at?: string
           user_id: string
           weight_kg?: number | null
@@ -178,7 +204,7 @@ export type Database = {
           model?: string | null
           name?: string
           points_value?: number
-          status?: string
+          status?: Database["public"]["Enums"]["gadget_status"]
           updated_at?: string
           user_id?: string
           weight_kg?: number | null
@@ -226,7 +252,7 @@ export type Database = {
           payment_method: string
           quantity: number
           shipping_address: string | null
-          status: string
+          status: Database["public"]["Enums"]["order_status"]
           total_amount: number
           total_points: number
           tracking: string | null
@@ -240,7 +266,7 @@ export type Database = {
           payment_method?: string
           quantity?: number
           shipping_address?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["order_status"]
           total_amount?: number
           total_points?: number
           tracking?: string | null
@@ -254,7 +280,7 @@ export type Database = {
           payment_method?: string
           quantity?: number
           shipping_address?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["order_status"]
           total_amount?: number
           total_points?: number
           tracking?: string | null
@@ -279,7 +305,7 @@ export type Database = {
           id: string
           method: string
           processed_at: string | null
-          status: string
+          status: Database["public"]["Enums"]["payout_status"]
           updated_at: string
           user_id: string
         }
@@ -290,7 +316,7 @@ export type Database = {
           id?: string
           method?: string
           processed_at?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["payout_status"]
           updated_at?: string
           user_id: string
         }
@@ -301,7 +327,7 @@ export type Database = {
           id?: string
           method?: string
           processed_at?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["payout_status"]
           updated_at?: string
           user_id?: string
         }
@@ -478,7 +504,7 @@ export type Database = {
           item_id: string | null
           notes: string | null
           offered_gadget_id: string | null
-          status: string
+          status: Database["public"]["Enums"]["swap_status"]
           updated_at: string
           user_id: string
         }
@@ -488,7 +514,7 @@ export type Database = {
           item_id?: string | null
           notes?: string | null
           offered_gadget_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["swap_status"]
           updated_at?: string
           user_id: string
         }
@@ -498,7 +524,7 @@ export type Database = {
           item_id?: string | null
           notes?: string | null
           offered_gadget_id?: string | null
-          status?: string
+          status?: Database["public"]["Enums"]["swap_status"]
           updated_at?: string
           user_id?: string
         }
@@ -527,7 +553,7 @@ export type Database = {
           message: string
           priority: string
           replies: number
-          status: string
+          status: Database["public"]["Enums"]["ticket_status"]
           subject: string
           updated_at: string
           user_id: string
@@ -539,7 +565,7 @@ export type Database = {
           message: string
           priority?: string
           replies?: number
-          status?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
           subject: string
           updated_at?: string
           user_id: string
@@ -551,7 +577,7 @@ export type Database = {
           message?: string
           priority?: string
           replies?: number
-          status?: string
+          status?: Database["public"]["Enums"]["ticket_status"]
           subject?: string
           updated_at?: string
           user_id?: string
@@ -620,6 +646,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_user: { Args: { _user_id: string }; Returns: undefined }
+      admin_set_user_role: {
+        Args: {
+          _grant: boolean
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: undefined
+      }
+      approve_gadget: { Args: { _gadget_id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -627,9 +663,29 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_article_views: {
+        Args: { _article_id: string }
+        Returns: undefined
+      }
+      redeem_reward: { Args: { _reward_id: string }; Returns: string }
+      redeem_swap_item: {
+        Args: { _item_id: string; _payment_method: string; _quantity: number }
+        Returns: string
+      }
+      reject_gadget: { Args: { _gadget_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
+      gadget_status: "pending" | "approved" | "sold" | "rejected"
+      order_status: "processing" | "shipped" | "delivered" | "cancelled"
+      payout_status: "pending" | "processing" | "completed" | "failed"
+      swap_status:
+        | "pending"
+        | "confirmed"
+        | "shipped"
+        | "delivered"
+        | "cancelled"
+      ticket_status: "open" | "in_progress" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -755,9 +811,24 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      gadget_status: ["pending", "approved", "sold", "rejected"],
+      order_status: ["processing", "shipped", "delivered", "cancelled"],
+      payout_status: ["pending", "processing", "completed", "failed"],
+      swap_status: [
+        "pending",
+        "confirmed",
+        "shipped",
+        "delivered",
+        "cancelled",
+      ],
+      ticket_status: ["open", "in_progress", "closed"],
     },
   },
 } as const
+
