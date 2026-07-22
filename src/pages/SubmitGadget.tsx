@@ -138,12 +138,19 @@ const SubmitGadget = () => {
                   <Textarea id="description" value={formData.description} onChange={(e) => handleInputChange("description", e.target.value)} rows={4} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Upload Images</Label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                    <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                    <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
-                  </div>
+                  <Label htmlFor="gadget-image">Upload Image</Label>
+                  <label htmlFor="gadget-image" className="block border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="Preview" className="mx-auto max-h-48 rounded-md object-contain" />
+                    ) : (
+                      <>
+                        <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Click to upload</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
+                      </>
+                    )}
+                    <input id="gadget-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                  </label>
                 </div>
                 <Button type="submit" disabled={saving} className="w-full bg-gradient-primary hover:opacity-90" size="lg">
                   {saving ? "Submitting…" : "Submit for Evaluation"}
