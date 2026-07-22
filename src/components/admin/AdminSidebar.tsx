@@ -3,11 +3,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   LayoutDashboard, BarChart3, FileBarChart, Smartphone, Users, FileText,
-  ShoppingBag, CreditCard, Package, Wallet, Settings, UserCircle, Shield,
-  UsersRound, TicketCheck, MessageSquare, Megaphone, ChevronLeft, ChevronRight,
-  Star, Clock, Search, Command, Bookmark, X
+  ShoppingBag, CreditCard, Package, Wallet, Settings, UserCircle,
+  TicketCheck, MessageSquare, Megaphone, ChevronLeft, ChevronRight,
+  Search, Bookmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface NavItem {
   label: string;
@@ -33,9 +34,9 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Content",
     items: [
-      { label: "Gadgets", icon: Smartphone, path: "/admin/gadgets", badge: 12 },
+      { label: "Gadgets", icon: Smartphone, path: "/admin/gadgets" },
       { label: "Users", icon: Users, path: "/admin/users" },
-      { label: "Articles", icon: FileText, path: "/admin/articles", badge: 3 },
+      { label: "Articles", icon: FileText, path: "/admin/articles" },
       { label: "Swaps", icon: ShoppingBag, path: "/admin/swaps" },
     ],
   },
@@ -43,7 +44,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Commerce",
     items: [
       { label: "Transactions", icon: CreditCard, path: "/admin/transactions" },
-      { label: "Orders", icon: Package, path: "/admin/orders", badge: 5 },
+      { label: "Orders", icon: Package, path: "/admin/orders" },
       { label: "Payouts", icon: Wallet, path: "/admin/payouts" },
     ],
   },
@@ -52,24 +53,16 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "System", icon: Settings, path: "/admin/settings" },
       { label: "Profile", icon: UserCircle, path: "/admin/profile" },
-      { label: "Security", icon: Shield, path: "/admin/security" },
-      { label: "Team", icon: UsersRound, path: "/admin/team" },
     ],
   },
   {
     title: "Support",
     items: [
-      { label: "Tickets", icon: TicketCheck, path: "/admin/tickets", badge: 8 },
+      { label: "Tickets", icon: TicketCheck, path: "/admin/tickets" },
       { label: "Feedback", icon: MessageSquare, path: "/admin/feedback" },
       { label: "Announcements", icon: Megaphone, path: "/admin/announcements" },
     ],
   },
-];
-
-const RECENT_ITEMS = [
-  { label: "User #4521", path: "/admin/users", icon: Users },
-  { label: "iPhone 14 Review", path: "/admin/gadgets", icon: Smartphone },
-  { label: "Payout Batch #12", path: "/admin/payouts", icon: Wallet },
 ];
 
 interface AdminSidebarProps {
@@ -85,6 +78,19 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
   const [expandedSections, setExpandedSections] = useState<string[]>(
     NAV_SECTIONS.map((s) => s.title)
   );
+  const [liveBadges, setLiveBadges] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("gadgets").select("id", { count: "exact", head: true }).eq("status", "pending"),
+      supabase.from("tickets").select("id", { count: "exact", head: true }).eq("status", "open"),
+    ]).then(([gadgets, tickets]) => {
+      setLiveBadges({
+        "/admin/gadgets": gadgets.count || 0,
+        "/admin/tickets": tickets.count || 0,
+      });
+    });
+  }, []);
 
   const isActive = (path?: string) => path && location.pathname === path;
 
@@ -110,7 +116,7 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
       <div className="h-16 flex items-center px-4 border-b border-border/30">
         <motion.div className="flex items-center gap-3 overflow-hidden">
           <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-bold text-sm">E</span>
+            <span className="text-primary-foreground font-bold text-sm">G</span>
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -120,7 +126,7 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
                 exit={{ opacity: 0, width: 0 }}
                 className="font-bold text-foreground whitespace-nowrap"
               >
-                EcoAdmin
+                Triple G Admin
               </motion.span>
             )}
           </AnimatePresence>
@@ -178,6 +184,7 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
                   {section.items.map((item) => {
                     const Icon = item.icon;
                     const active = isActive(item.path);
+                    const badge = item.badge ?? (item.path ? liveBadges[item.path] : undefined);
                     return (
                       <motion.button
                         key={item.label}
@@ -206,13 +213,13 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
                         {!collapsed && (
                           <>
                             <span className="flex-1 text-left whitespace-nowrap">{item.label}</span>
-                            {item.badge && (
+                            {!!badge && (
                               <motion.span
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
                                 className="min-w-[20px] h-5 flex items-center justify-center rounded-full bg-primary/20 text-primary text-[11px] font-medium px-1.5 animate-glow-pulse"
                               >
-                                {item.badge}
+                                {badge}
                               </motion.span>
                             )}
                             <span
@@ -247,8 +254,8 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
                         {collapsed && (
                           <div className="absolute left-full ml-2 px-2 py-1 rounded-md bg-popover text-popover-foreground text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-50 shadow-elevated">
                             {item.label}
-                            {item.badge && (
-                              <span className="ml-1.5 text-primary">({item.badge})</span>
+                            {!!badge && (
+                              <span className="ml-1.5 text-primary">({badge})</span>
                             )}
                           </div>
                         )}
@@ -260,28 +267,6 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
             </AnimatePresence>
           </div>
         ))}
-
-        {/* Recent items */}
-        {!collapsed && (
-          <div className="mt-4 px-4">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground/60 mb-2 flex items-center gap-1.5">
-              <Clock className="w-3 h-3" /> Recent
-            </p>
-            {RECENT_ITEMS.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => navigate(item.path)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Collapse toggle */}
