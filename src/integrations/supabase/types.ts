@@ -211,6 +211,24 @@ export type Database = {
         }
         Relationships: []
       }
+      newsletter_subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           body: string | null
@@ -656,6 +674,15 @@ export type Database = {
         Returns: undefined
       }
       approve_gadget: { Args: { _gadget_id: string }; Returns: undefined }
+      get_public_stats: {
+        Args: never
+        Returns: {
+          active_users: number
+          co2_saved_kg: number
+          gadgets_recycled: number
+          points_distributed: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -673,6 +700,7 @@ export type Database = {
         Returns: string
       }
       reject_gadget: { Args: { _gadget_id: string }; Returns: undefined }
+      self_delete_account: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"
