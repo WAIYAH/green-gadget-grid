@@ -1,19 +1,16 @@
+import { useCallback, useEffect, useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Award, Gift, Coins, Sparkles, Star, Crown, Lock } from "lucide-react";
+import { Award, Gift, Coins, Sparkles, Crown, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-const REWARDS = [
-  { id: 1, name: "Amazon Gift Card $10", cost: 1000, icon: Gift, category: "Gift Cards" },
-  { id: 2, name: "Amazon Gift Card $25", cost: 2500, icon: Gift, category: "Gift Cards" },
-  { id: 3, name: "Tree Planted in Your Name", cost: 500, icon: Sparkles, category: "Impact" },
-  { id: 4, name: "Eco Tote Bag", cost: 1500, icon: Star, category: "Merch" },
-  { id: 5, name: "Premium Membership (1 mo)", cost: 3000, icon: Crown, category: "Membership" },
-  { id: 6, name: "Refurbished Earbuds", cost: 4500, icon: Award, category: "Gadgets" },
-];
+type Reward = Database["public"]["Tables"]["rewards"]["Row"];
 
 const TIERS = [
   { name: "Bronze", min: 0, color: "text-amber-700" },
@@ -22,11 +19,48 @@ const TIERS = [
   { name: "Platinum", min: 10000, color: "text-cyan-300" },
 ];
 
+const iconForCategory = (category: string | null) => {
+  const c = (category || "").toLowerCase();
+  if (c.includes("gift")) return Gift;
+  if (c.includes("donation") || c.includes("impact")) return Sparkles;
+  if (c.includes("perk") || c.includes("membership")) return Crown;
+  return Award;
+};
+
 const DashboardRewards = () => {
-  const points = 2450;
+  const { user } = useAuth();
+  const [rewards, setRewards] = useState<Reward[]>([]);
+  const [points, setPoints] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [redeemingId, setRedeemingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [{ data: rewardRows, error }, profileRes] = await Promise.all([
+      supabase.from("rewards").select("*").eq("active", true).order("points_cost", { ascending: true }),
+      user ? supabase.from("profiles").select("points").eq("id", user.id).maybeSingle() : Promise.resolve({ data: null }),
+    ]);
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    setRewards(rewardRows || []);
+    setPoints(profileRes.data?.points ?? 0);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
   const currentTier = TIERS.slice().reverse().find((t) => points >= t.min) ?? TIERS[0];
   const nextTier = TIERS.find((t) => t.min > points);
   const progress = nextTier ? ((points - currentTier.min) / (nextTier.min - currentTier.min)) * 100 : 100;
+
+  const redeem = async (reward: Reward) => {
+    setRedeemingId(reward.id);
+    const { error } = await supabase.rpc("redeem_reward", { _reward_id: reward.id });
+    setRedeemingId(null);
+    if (error) return toast.error(error.message);
+    toast.success(`${reward.name} redeemed!`);
+    load();
+    window.dispatchEvent(new Event("points:refresh"));
+  };
 
   return (
     <DashboardLayout title="Rewards">
@@ -71,33 +105,44 @@ const DashboardRewards = () => {
       </Card>
 
       <h2 className="text-lg font-bold mb-3">Available Rewards</h2>
+      {loading ? (
+        <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading rewards…
+        </div>
+      ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {REWARDS.map((r) => {
-          const Icon = r.icon;
-          const affordable = points >= r.cost;
+        {rewards.map((r) => {
+          const Icon = iconForCategory(r.category);
+          const affordable = points >= r.points_cost && r.stock > 0;
           return (
             <Card key={r.id} className="p-5 glass-lg border-border/30 flex flex-col">
               <div className="flex items-start justify-between mb-3">
                 <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center text-primary-foreground">
                   <Icon className="w-6 h-6" />
                 </div>
-                <Badge variant="outline" className="text-[10px] border-border/40">{r.category}</Badge>
+                {r.category && <Badge variant="outline" className="text-[10px] border-border/40">{r.category}</Badge>}
               </div>
               <h3 className="font-semibold text-foreground mb-1">{r.name}</h3>
-              <p className="text-sm text-primary font-bold mb-4 flex items-center gap-1">
-                <Coins className="w-4 h-4" /> {r.cost.toLocaleString()} pts
+              {r.description && <p className="text-xs text-muted-foreground mb-2">{r.description}</p>}
+              <p className="text-sm text-primary font-bold mb-1 flex items-center gap-1">
+                <Coins className="w-4 h-4" /> {r.points_cost.toLocaleString()} pts
               </p>
+              <p className="text-[11px] text-muted-foreground mb-4">{r.stock > 0 ? `${r.stock} left` : "Out of stock"}</p>
               <Button
-                disabled={!affordable}
-                onClick={() => toast.success(`${r.name} redeemed!`)}
+                disabled={!affordable || redeemingId === r.id}
+                onClick={() => redeem(r)}
                 className="mt-auto bg-gradient-primary text-primary-foreground disabled:opacity-50"
               >
-                {affordable ? (<>Redeem</>) : (<><Lock className="w-4 h-4 mr-1.5" /> Not enough points</>)}
+                {redeemingId === r.id ? "Redeeming…" : affordable ? "Redeem" : (<><Lock className="w-4 h-4 mr-1.5" /> {r.stock <= 0 ? "Out of stock" : "Not enough points"}</>)}
               </Button>
             </Card>
           );
         })}
+        {rewards.length === 0 && (
+          <Card className="p-8 glass-lg border-border/30 text-center text-muted-foreground sm:col-span-2 lg:col-span-3">No rewards available right now.</Card>
+        )}
       </div>
+      )}
     </DashboardLayout>
   );
 };

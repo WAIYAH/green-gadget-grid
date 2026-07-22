@@ -1,49 +1,59 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, RotateCw, ExternalLink, ShoppingBag } from "lucide-react";
+import { Package, ShoppingBag, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-interface Order {
-  id: string;
-  item: string;
-  qty: number;
-  total: string;
-  date: string;
-  status: "Processing" | "Shipped" | "Delivered" | "Returned";
-  tracking?: string;
-}
+type Order = Database["public"]["Tables"]["orders"]["Row"];
+type SwapItem = Pick<Database["public"]["Tables"]["swap_items"]["Row"], "id" | "name">;
 
-const ORDERS: Order[] = [
-  { id: "ORD-9001", item: "Eco Phone Case (Recycled Plastic)", qty: 2, total: "$24.00", date: "2025-12-19", status: "Shipped", tracking: "UPS3344" },
-  { id: "ORD-9000", item: "Refurbished AirPods Pro", qty: 1, total: "$120.00", date: "2025-12-12", status: "Delivered", tracking: "FDX1122" },
-  { id: "ORD-8999", item: "Bamboo Charging Stand", qty: 1, total: "$18.50", date: "2025-12-02", status: "Delivered" },
-  { id: "ORD-8998", item: "Reclaimed Laptop Sleeve", qty: 1, total: "$32.00", date: "2025-11-21", status: "Returned" },
-];
-
-const statusColor = {
-  Processing: "bg-accent/15 text-accent border-accent/30",
-  Shipped: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  Delivered: "bg-primary/15 text-primary border-primary/30",
-  Returned: "bg-destructive/15 text-destructive border-destructive/30",
+const statusColor: Record<Order["status"], string> = {
+  processing: "bg-accent/15 text-accent border-accent/30",
+  shipped: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  delivered: "bg-primary/15 text-primary border-primary/30",
+  cancelled: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 const DashboardOrders = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [items, setItems] = useState<Record<string, SwapItem>>({});
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
 
-  const filtered = filter === "All" ? ORDERS : ORDERS.filter((o) => o.status === filter);
+  const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase.from("orders").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    const rows = data || [];
+    setOrders(rows);
+    const itemIds = Array.from(new Set(rows.map((o) => o.item_id).filter((id): id is string => !!id)));
+    if (itemIds.length) {
+      const { data: itemRows } = await supabase.from("swap_items").select("id, name").in("id", itemIds);
+      setItems(Object.fromEntries((itemRows || []).map((i) => [i.id, i])));
+    }
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = filter === "All" ? orders : orders.filter((o) => o.status.toLowerCase() === filter.toLowerCase());
 
   return (
     <DashboardLayout title="Orders">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold">My Orders</h1>
-          <p className="text-sm text-muted-foreground">Items purchased from the Swap & Exchange Center.</p>
+          <p className="text-sm text-muted-foreground">Items redeemed from the Swap & Exchange Center.</p>
         </div>
         <Button onClick={() => navigate("/swap")} className="bg-gradient-primary text-primary-foreground">
           <ShoppingBag className="w-4 h-4 mr-2" /> Browse Swap Center
@@ -56,9 +66,15 @@ const DashboardOrders = () => {
           <TabsTrigger value="Processing">Processing</TabsTrigger>
           <TabsTrigger value="Shipped">Shipped</TabsTrigger>
           <TabsTrigger value="Delivered">Delivered</TabsTrigger>
+          <TabsTrigger value="Cancelled">Cancelled</TabsTrigger>
         </TabsList>
       </Tabs>
 
+      {loading ? (
+        <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading orders…
+        </div>
+      ) : (
       <div className="space-y-3">
         {filtered.map((o) => (
           <Card key={o.id} className="p-5 glass-lg border-border/30">
@@ -68,9 +84,9 @@ const DashboardOrders = () => {
                   <Package className="w-6 h-6" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground">{o.item}</p>
+                  <p className="font-semibold text-foreground">{o.item_id ? items[o.item_id]?.name || "Item" : "Item"}</p>
                   <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                    {o.id} • Qty {o.qty} • {new Date(o.date).toLocaleDateString()}
+                    Qty {o.quantity} • {new Date(o.created_at).toLocaleDateString()}
                   </p>
                   {o.tracking && (
                     <p className="text-xs text-muted-foreground mt-1">Tracking: <span className="font-mono text-foreground">{o.tracking}</span></p>
@@ -78,16 +94,10 @@ const DashboardOrders = () => {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <p className="text-lg font-bold text-foreground">{o.total}</p>
-                <Badge variant="outline" className={statusColor[o.status]}>{o.status}</Badge>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="border-border/50" onClick={() => toast.info(`Reordering ${o.item}`)}>
-                  <RotateCw className="w-3.5 h-3.5 mr-1.5" /> Reorder
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => toast.info(`Order ${o.id} details`)}>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </Button>
+                <p className="text-lg font-bold text-foreground">
+                  {o.payment_method === "points" ? `${o.total_points.toLocaleString()} pts` : `$${Number(o.total_amount).toFixed(2)}`}
+                </p>
+                <Badge variant="outline" className={`capitalize ${statusColor[o.status]}`}>{o.status}</Badge>
               </div>
             </div>
           </Card>
@@ -96,6 +106,7 @@ const DashboardOrders = () => {
           <Card className="p-8 glass-lg border-border/30 text-center text-muted-foreground">No orders yet.</Card>
         )}
       </div>
+      )}
     </DashboardLayout>
   );
 };

@@ -28,11 +28,14 @@ const SubmitGadget = () => {
   });
   const [estimatedPoints, setEstimatedPoints] = useState(0);
 
+  const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) return toast.error("Image must be under 10MB");
-    if (!file.type.startsWith("image/")) return toast.error("Please select an image");
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return toast.error("Please select a JPG, PNG, WEBP or GIF image");
+    if (file.size > MAX_IMAGE_BYTES) return toast.error("Image must be under 5MB");
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
   };
@@ -146,10 +149,10 @@ const SubmitGadget = () => {
                       <>
                         <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
                         <p className="text-sm text-muted-foreground">Click to upload</p>
-                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP or GIF up to 5MB</p>
                       </>
                     )}
-                    <input id="gadget-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                    <input id="gadget-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageChange} />
                   </label>
                 </div>
                 <Button type="submit" disabled={saving} className="w-full bg-gradient-primary hover:opacity-90" size="lg">

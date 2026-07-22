@@ -58,6 +58,7 @@ import {
   Smartphone,
   Tablet,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { AwarenessProvider, useAwareness, ContentItem } from "@/contexts/AwarenessContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -65,7 +66,7 @@ import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 // ─── Floating E-Waste Icon ───────────────────────────────────────
-const FloatingIcon = ({ icon: Icon, delay, x, y }: { icon: any; delay: number; x: string; y: string }) => (
+const FloatingIcon = ({ icon: Icon, delay, x, y }: { icon: LucideIcon; delay: number; x: string; y: string }) => (
   <motion.div
     className="absolute text-primary/20"
     style={{ left: x, top: y }}
@@ -210,7 +211,7 @@ const SearchWithSuggestions = ({
 // ─── Category Chip ───────────────────────────────────────────────
 const CategoryChip = ({
   cat, active, count, onClick,
-}: { cat: { name: string; icon: any; emoji: string }; active: boolean; count: number; onClick: () => void }) => {
+}: { cat: { name: string; icon: LucideIcon; emoji: string }; active: boolean; count: number; onClick: () => void }) => {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
 
@@ -500,7 +501,7 @@ const ContentCard = ({
 };
 
 // ─── Animated Counter ────────────────────────────────────────────
-const AnimCounter = ({ end, label, icon: Icon }: { end: number; label: string; icon: any }) => {
+const AnimCounter = ({ end, label, icon: Icon }: { end: number; label: string; icon: LucideIcon }) => {
   const [val, setVal] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true });
@@ -536,7 +537,7 @@ const AnimCounter = ({ end, label, icon: Icon }: { end: number; label: string; i
 // ─── Achievement Badge ───────────────────────────────────────────
 const AchievementBadge = ({
   icon: Icon, title, desc, unlocked, delay,
-}: { icon: any; title: string; desc: string; unlocked: boolean; delay: number }) => {
+}: { icon: LucideIcon; title: string; desc: string; unlocked: boolean; delay: number }) => {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true });
 
@@ -716,16 +717,16 @@ const AwarenessContent = () => {
     toast.success("Link copied to clipboard!");
   };
 
-  const handleSubmitContent = () => {
+  const handleSubmitContent = async () => {
     if (!formData.title || !formData.description || !formData.author) {
       toast.error("Please fill in all required fields");
       return;
     }
     if (isEditMode && editingItem) {
-      updateContent(editingItem.id, { ...formData, date: editingItem.date });
+      await updateContent(editingItem.id, { ...formData, date: editingItem.date });
       toast.success("Content updated!");
     } else {
-      addContent({ ...formData, date: new Date().toISOString().split("T")[0] });
+      await addContent({ ...formData, date: new Date().toISOString().split("T")[0] });
       toast.success("Content added!");
     }
     setIsAdminDialogOpen(false);
@@ -749,9 +750,9 @@ const AwarenessContent = () => {
     setIsAdminDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm("Delete this content?")) {
-      deleteContent(id);
+      await deleteContent(id);
       toast.success("Deleted!");
     }
   };
@@ -766,7 +767,7 @@ const AwarenessContent = () => {
   };
 
   const filteredContent = useMemo(() => {
-    let filtered = content.filter((item) => {
+    const filtered = content.filter((item) => {
       const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === "All" || item.category === selectedCategory;

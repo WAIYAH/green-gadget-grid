@@ -25,6 +25,11 @@ import {
   Smartphone,
   Tablet,
   Headphones,
+  Watch,
+  BookOpen,
+  Home as HomeIcon,
+  Gamepad2,
+  Package,
   Award,
   Search,
   Coins,
@@ -36,20 +41,21 @@ import {
   Plus,
   Minus,
   ShoppingCart,
-  Star,
   Zap,
   RotateCw,
-  ChevronLeft,
-  ChevronRight,
   GitCompare,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 // --- Types ---
+type SwapItemRow = Database["public"]["Tables"]["swap_items"]["Row"];
+
 interface SwapItem {
-  id: number;
+  id: string;
   name: string;
   category: string;
   icon: typeof Laptop;
@@ -58,82 +64,45 @@ interface SwapItem {
   description: string;
   available: boolean;
   image: string;
-  condition: "Refurbished" | "Like New" | "Good";
+  condition: string;
   stock: number;
-  maxStock: number;
-  rating: number;
-  specs: { label: string; value: string }[];
 }
 
-interface Transaction {
-  id: number;
+interface RecentOrder {
+  id: string;
   itemName: string;
   pointsUsed: number;
   cashUsed: number;
   date: string;
-  status: "Completed" | "Pending";
+  status: string;
 }
 
-// --- Data ---
-const swapItems: SwapItem[] = [
-  {
-    id: 1, name: "Refurbished MacBook Air", category: "Laptop", icon: Laptop,
-    points: 5000, cash: 450, description: "2020 model, 8GB RAM, 256GB SSD, excellent condition",
-    available: true, image: "/placeholder.svg", condition: "Refurbished", stock: 5, maxStock: 10, rating: 4.8,
-    specs: [{ label: "CPU", value: "M1 Chip" }, { label: "RAM", value: "8GB" }, { label: "Storage", value: "256GB SSD" }, { label: "Display", value: "13.3\" Retina" }],
-  },
-  {
-    id: 2, name: "Samsung Galaxy S21", category: "Smartphone", icon: Smartphone,
-    points: 3500, cash: 320, description: "Unlocked, good condition, includes charger",
-    available: true, image: "/placeholder.svg", condition: "Good", stock: 8, maxStock: 15, rating: 4.5,
-    specs: [{ label: "CPU", value: "Exynos 2100" }, { label: "RAM", value: "8GB" }, { label: "Storage", value: "128GB" }, { label: "Display", value: "6.2\" AMOLED" }],
-  },
-  {
-    id: 3, name: "iPad 9th Gen", category: "Tablet", icon: Tablet,
-    points: 4200, cash: 380, description: "64GB, Wi-Fi, like new condition",
-    available: false, image: "/placeholder.svg", condition: "Like New", stock: 0, maxStock: 8, rating: 4.7,
-    specs: [{ label: "CPU", value: "A13 Bionic" }, { label: "RAM", value: "3GB" }, { label: "Storage", value: "64GB" }, { label: "Display", value: "10.2\" Retina" }],
-  },
-  {
-    id: 4, name: "Sony WH-1000XM4", category: "Headphones", icon: Headphones,
-    points: 1800, cash: 165, description: "Noise-cancelling, excellent condition",
-    available: true, image: "/placeholder.svg", condition: "Refurbished", stock: 12, maxStock: 20, rating: 4.9,
-    specs: [{ label: "Type", value: "Over-ear" }, { label: "ANC", value: "Yes" }, { label: "Battery", value: "30 hours" }, { label: "Weight", value: "254g" }],
-  },
-  {
-    id: 5, name: "Refurbished Dell XPS 13", category: "Laptop", icon: Laptop,
-    points: 5500, cash: 495, description: "2021 model, 16GB RAM, 512GB SSD",
-    available: true, image: "/placeholder.svg", condition: "Like New", stock: 3, maxStock: 6, rating: 4.6,
-    specs: [{ label: "CPU", value: "Intel i7-1185G7" }, { label: "RAM", value: "16GB" }, { label: "Storage", value: "512GB SSD" }, { label: "Display", value: "13.4\" FHD+" }],
-  },
-  {
-    id: 6, name: "iPhone 11", category: "Smartphone", icon: Smartphone,
-    points: 2800, cash: 255, description: "64GB, good condition, battery health 85%",
-    available: true, image: "/placeholder.svg", condition: "Good", stock: 6, maxStock: 10, rating: 4.3,
-    specs: [{ label: "CPU", value: "A13 Bionic" }, { label: "RAM", value: "4GB" }, { label: "Storage", value: "64GB" }, { label: "Display", value: "6.1\" Liquid Retina" }],
-  },
-  {
-    id: 7, name: "AirPods Pro 2nd Gen", category: "Headphones", icon: Headphones,
-    points: 2200, cash: 200, description: "Active noise cancellation, MagSafe case",
-    available: true, image: "/placeholder.svg", condition: "Like New", stock: 9, maxStock: 15, rating: 4.8,
-    specs: [{ label: "Type", value: "In-ear" }, { label: "ANC", value: "Yes" }, { label: "Battery", value: "6 hours" }, { label: "Case", value: "MagSafe" }],
-  },
-  {
-    id: 8, name: "Samsung Galaxy Tab S7", category: "Tablet", icon: Tablet,
-    points: 3800, cash: 345, description: "128GB, Wi-Fi, S Pen included",
-    available: true, image: "/placeholder.svg", condition: "Refurbished", stock: 4, maxStock: 8, rating: 4.4,
-    specs: [{ label: "CPU", value: "Snapdragon 865+" }, { label: "RAM", value: "6GB" }, { label: "Storage", value: "128GB" }, { label: "Display", value: "11\" LTPS" }],
-  },
-];
+const iconForCategory = (category: string): typeof Laptop => {
+  const c = category.toLowerCase();
+  if (c.includes("laptop")) return Laptop;
+  if (c.includes("phone")) return Smartphone;
+  if (c.includes("tablet")) return Tablet;
+  if (c.includes("audio") || c.includes("headphone") || c.includes("speaker")) return Headphones;
+  if (c.includes("wearable") || c.includes("watch")) return Watch;
+  if (c.includes("reader") || c.includes("book")) return BookOpen;
+  if (c.includes("smart-home") || c.includes("home")) return HomeIcon;
+  if (c.includes("gaming") || c.includes("game")) return Gamepad2;
+  return Package;
+};
 
-const mockTransactions: Transaction[] = [
-  { id: 1, itemName: "Sony WH-1000XM4", pointsUsed: 1800, cashUsed: 0, date: "2024-10-15", status: "Completed" },
-  { id: 2, itemName: "iPhone 11", pointsUsed: 0, cashUsed: 255, date: "2024-10-10", status: "Completed" },
-  { id: 3, itemName: "AirPods Pro", pointsUsed: 2200, cashUsed: 0, date: "2024-09-28", status: "Pending" },
-];
-
-const categories = ["All", "Laptop", "Smartphone", "Tablet", "Headphones"];
-const conditions = ["All", "Refurbished", "Like New", "Good"];
+const fromRow = (row: SwapItemRow): SwapItem => ({
+  id: row.id,
+  name: row.name,
+  category: row.category,
+  icon: iconForCategory(row.category),
+  points: row.points_price,
+  cash: Number(row.cash_price),
+  description: row.description || "",
+  available: row.status !== "out" && row.stock > 0,
+  image: row.image_url || "/placeholder.svg",
+  condition: row.condition,
+  stock: row.stock,
+});
 
 // --- Animated Counter ---
 const AnimatedCounter = ({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) => {
@@ -144,7 +113,7 @@ const AnimatedCounter = ({ value, prefix = "", suffix = "" }: { value: number; p
   useEffect(() => {
     if (!inView) return;
     let start = 0;
-    const step = Math.ceil(value / 30);
+    const step = Math.ceil(value / 30) || 1;
     const interval = setInterval(() => {
       start = Math.min(start + step, value);
       setDisplay(start);
@@ -171,9 +140,9 @@ const ProductCard = ({
   onQuickView: (item: SwapItem) => void;
   onSwap: (item: SwapItem) => void;
   isWishlisted: boolean;
-  onToggleWishlist: (id: number) => void;
+  onToggleWishlist: (id: string) => void;
   isComparing: boolean;
-  onToggleCompare: (id: number) => void;
+  onToggleCompare: (id: string) => void;
   showCash: boolean;
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -212,7 +181,6 @@ const ProductCard = ({
   };
 
   const Icon = item.icon;
-  const stockPercent = (item.stock / item.maxStock) * 100;
 
   return (
     <motion.div
@@ -287,7 +255,7 @@ const ProductCard = ({
           </motion.div>
 
           {/* Condition badge */}
-          <Badge className="absolute top-3 left-3 bg-primary/10 text-primary border-primary/20 text-xs">
+          <Badge className="absolute top-3 left-3 bg-primary/10 text-primary border-primary/20 text-xs capitalize">
             {item.condition}
           </Badge>
 
@@ -315,36 +283,14 @@ const ProductCard = ({
 
         {/* Content */}
         <div className="p-5 flex flex-col flex-1">
-          {/* Rating */}
-          <div className="flex items-center gap-1 mb-2">
-            {[...Array(5)].map((_, i) => (
-              <Star
-                key={i}
-                className={`w-3.5 h-3.5 ${i < Math.floor(item.rating) ? "fill-accent text-accent" : "text-muted-foreground/30"}`}
-              />
-            ))}
-            <span className="text-xs text-muted-foreground ml-1">{item.rating}</span>
-          </div>
-
           <h3 className="text-lg font-bold mb-1 text-foreground">{item.name}</h3>
           <p className="text-sm text-muted-foreground mb-4 flex-grow line-clamp-2">{item.description}</p>
 
           {/* Stock indicator */}
           <div className="mb-4">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-muted-foreground">
-                {item.stock > 0 ? `${item.stock} in stock` : "Out of stock"}
-              </span>
-              <span className="text-muted-foreground">{Math.round(stockPercent)}%</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${stockPercent}%` }}
-                transition={{ duration: 1, delay: 0.3 }}
-                className={`h-full rounded-full ${stockPercent > 50 ? "bg-primary" : stockPercent > 20 ? "bg-accent" : "bg-destructive"}`}
-              />
-            </div>
+            <span className="text-xs text-muted-foreground">
+              {item.stock > 0 ? `${item.stock} in stock` : "Out of stock"}
+            </span>
           </div>
 
           {/* Price with flip */}
@@ -360,7 +306,7 @@ const ProductCard = ({
               >
                 {showCash ? (
                   <>
-                    <span className="text-2xl font-bold text-primary">${item.cash}</span>
+                    <span className="text-2xl font-bold text-primary">${item.cash.toFixed(2)}</span>
                     <span className="text-xs text-muted-foreground">USD</span>
                   </>
                 ) : (
@@ -411,7 +357,7 @@ const QuickViewModal = ({
 }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [rotation, setRotation] = useState(0);
-  const tabs = ["Overview", "Specs", "Reviews"];
+  const tabs = ["Overview", "Details"];
 
   useEffect(() => {
     if (!open) return;
@@ -443,14 +389,8 @@ const QuickViewModal = ({
           {/* Right: Info */}
           <div className="p-6 flex flex-col">
             <DialogHeader className="p-0 mb-4">
-              <Badge className="w-fit mb-2 bg-primary/10 text-primary border-primary/20 text-xs">{item.condition}</Badge>
+              <Badge className="w-fit mb-2 bg-primary/10 text-primary border-primary/20 text-xs capitalize">{item.condition}</Badge>
               <DialogTitle className="text-xl">{item.name}</DialogTitle>
-              <div className="flex items-center gap-1 mt-1">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className={`w-3.5 h-3.5 ${i < Math.floor(item.rating) ? "fill-accent text-accent" : "text-muted-foreground/30"}`} />
-                ))}
-                <span className="text-xs text-muted-foreground ml-1">{item.rating}</span>
-              </div>
             </DialogHeader>
 
             {/* Tabs */}
@@ -479,19 +419,19 @@ const QuickViewModal = ({
                   <p className="text-sm text-muted-foreground">{item.description}</p>
                 )}
                 {activeTab === 1 && (
-                  <div className="space-y-2">
-                    {item.specs.map((s) => (
-                      <div key={s.label} className="flex justify-between text-sm py-1.5 border-b border-border/30">
-                        <span className="text-muted-foreground">{s.label}</span>
-                        <span className="font-medium text-foreground">{s.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {activeTab === 2 && (
-                  <div className="text-center py-6 text-muted-foreground text-sm">
-                    <Sparkles className="w-8 h-8 mx-auto mb-2 text-primary/40" />
-                    No reviews yet
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between py-1.5 border-b border-border/30">
+                      <span className="text-muted-foreground">Category</span>
+                      <span className="font-medium text-foreground capitalize">{item.category}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-border/30">
+                      <span className="text-muted-foreground">Condition</span>
+                      <span className="font-medium text-foreground capitalize">{item.condition}</span>
+                    </div>
+                    <div className="flex justify-between py-1.5 border-b border-border/30">
+                      <span className="text-muted-foreground">In stock</span>
+                      <span className="font-medium text-foreground">{item.stock}</span>
+                    </div>
                   </div>
                 )}
               </motion.div>
@@ -501,7 +441,7 @@ const QuickViewModal = ({
             <div className="mt-4 pt-4 border-t border-border/30">
               <div className="flex items-baseline gap-2 mb-3">
                 <span className="text-2xl font-bold text-primary">
-                  {showCash ? `$${item.cash}` : `${item.points.toLocaleString()} pts`}
+                  {showCash ? `$${item.cash.toFixed(2)}` : `${item.points.toLocaleString()} pts`}
                 </span>
               </div>
               <Button
@@ -546,17 +486,19 @@ const ComparisonModal = ({
             <div key={item.id} className="rounded-xl glass p-4 text-center">
               <Icon className="w-12 h-12 text-primary/50 mx-auto mb-3" />
               <h4 className="font-bold text-sm mb-1">{item.name}</h4>
-              <Badge className="mb-3 bg-primary/10 text-primary text-xs">{item.condition}</Badge>
+              <Badge className="mb-3 bg-primary/10 text-primary text-xs capitalize">{item.condition}</Badge>
               <div className="space-y-2 text-xs">
-                {item.specs.map((s) => (
-                  <div key={s.label} className="flex justify-between py-1 border-b border-border/20">
-                    <span className="text-muted-foreground">{s.label}</span>
-                    <span className="font-medium">{s.value}</span>
-                  </div>
-                ))}
+                <div className="flex justify-between py-1 border-b border-border/20">
+                  <span className="text-muted-foreground">Category</span>
+                  <span className="font-medium capitalize">{item.category}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/20">
+                  <span className="text-muted-foreground">Stock</span>
+                  <span className="font-medium">{item.stock}</span>
+                </div>
                 <div className="pt-2">
                   <span className="text-lg font-bold text-primary">
-                    {showCash ? `$${item.cash}` : `${item.points.toLocaleString()} pts`}
+                    {showCash ? `$${item.cash.toFixed(2)}` : `${item.points.toLocaleString()} pts`}
                   </span>
                 </div>
               </div>
@@ -576,23 +518,68 @@ const Swap = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAuthenticated = !!user;
-  const [userPoints, setUserPoints] = useState(7250);
-  const [pointsSpent] = useState(4600);
+
+  const [items, setItems] = useState<SwapItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userPoints, setUserPoints] = useState(0);
+  const [pointsSpent, setPointsSpent] = useState(0);
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [conditionFilter, setConditionFilter] = useState("All");
   const [priceRange, setPriceRange] = useState([0, 6000]);
   const [showCash, setShowCash] = useState(false);
-  const [wishlist, setWishlist] = useState<number[]>([]);
-  const [compareList, setCompareList] = useState<number[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [compareList, setCompareList] = useState<string[]>([]);
   const [quickViewItem, setQuickViewItem] = useState<SwapItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<SwapItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"points" | "cash">("points");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [showCompare, setShowCompare] = useState(false);
   const [columns, setColumns] = useState(3);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  const loadCatalog = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("swap_items").select("*").order("created_at", { ascending: false });
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    setItems((data || []).map(fromRow));
+    setLoading(false);
+  }, []);
+
+  const loadUserData = useCallback(async () => {
+    if (!user) { setUserPoints(0); setPointsSpent(0); setRecentOrders([]); return; }
+    const [{ data: profile }, { data: orders }] = await Promise.all([
+      supabase.from("profiles").select("points").eq("id", user.id).maybeSingle(),
+      supabase.from("orders").select("id, item_id, total_points, total_amount, payment_method, status, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+    ]);
+    setUserPoints(profile?.points ?? 0);
+
+    const rows = orders || [];
+    const itemIds = Array.from(new Set(rows.map((o) => o.item_id).filter((id): id is string => !!id)));
+    let names: Record<string, string> = {};
+    if (itemIds.length) {
+      const { data: itemRows } = await supabase.from("swap_items").select("id, name").in("id", itemIds);
+      names = Object.fromEntries((itemRows || []).map((i) => [i.id, i.name]));
+    }
+    setRecentOrders(rows.map((o) => ({
+      id: o.id,
+      itemName: o.item_id ? names[o.item_id] || "Item" : "Item",
+      pointsUsed: o.total_points,
+      cashUsed: Number(o.total_amount),
+      date: o.created_at,
+      status: o.status,
+    })));
+    setPointsSpent(rows.reduce((s, o) => s + o.total_points, 0));
+  }, [user]);
+
+  useEffect(() => { loadCatalog(); }, [loadCatalog]);
+  useEffect(() => { loadUserData(); }, [loadUserData]);
+
+  const categories = ["All", ...Array.from(new Set(items.map((i) => i.category)))];
+  const conditions = ["All", ...Array.from(new Set(items.map((i) => i.condition)))];
 
   // Active filter chips
   const activeFilters: { label: string; onRemove: () => void }[] = [];
@@ -601,11 +588,11 @@ const Swap = () => {
   if (priceRange[0] > 0 || priceRange[1] < 6000) activeFilters.push({ label: `${priceRange[0]}-${priceRange[1]} pts`, onRemove: () => setPriceRange([0, 6000]) });
   if (searchQuery) activeFilters.push({ label: `"${searchQuery}"`, onRemove: () => setSearchQuery("") });
 
-  const toggleWishlist = (id: number) => {
+  const toggleWishlist = (id: string) => {
     setWishlist((prev) => prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]);
   };
 
-  const toggleCompare = (id: number) => {
+  const toggleCompare = (id: string) => {
     setCompareList((prev) => {
       if (prev.includes(id)) return prev.filter((i) => i !== id);
       if (prev.length >= 3) { toast.error("Max 3 items to compare"); return prev; }
@@ -624,24 +611,29 @@ const Swap = () => {
     setIsDialogOpen(true);
   };
 
-  const handleConfirmSwap = () => {
+  const handleConfirmSwap = async () => {
     if (!selectedItem) return;
-    if (paymentMethod === "points") {
-      if (userPoints >= selectedItem.points) {
-        setUserPoints((prev) => prev - selectedItem.points);
-        toast.success(`🎉 Successfully claimed ${selectedItem.name}!`);
-      } else {
-        toast.error(`You need ${selectedItem.points - userPoints} more points`);
-        setIsDialogOpen(false);
-        return;
-      }
-    } else {
-      toast.success(`🎉 Purchased ${selectedItem.name} for $${selectedItem.cash}!`);
+    if (paymentMethod === "points" && userPoints < selectedItem.points) {
+      toast.error(`You need ${selectedItem.points - userPoints} more points`);
+      setIsDialogOpen(false);
+      return;
     }
+    setConfirming(true);
+    const { error } = await supabase.rpc("redeem_swap_item", {
+      _item_id: selectedItem.id,
+      _quantity: 1,
+      _payment_method: paymentMethod,
+    });
+    setConfirming(false);
     setIsDialogOpen(false);
+    if (error) return toast.error(error.message);
+    toast.success(`🎉 Successfully claimed ${selectedItem.name}!`);
+    loadCatalog();
+    loadUserData();
+    window.dispatchEvent(new Event("points:refresh"));
   };
 
-  const filteredItems = swapItems.filter((item) => {
+  const filteredItems = items.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === "All" || item.category === categoryFilter;
     const matchesCondition = conditionFilter === "All" || item.condition === conditionFilter;
@@ -684,7 +676,7 @@ const Swap = () => {
                   key={cat}
                   whileTap={{ scale: 0.9 }}
                   onClick={() => setCategoryFilter(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-all ${
                     categoryFilter === cat
                       ? "bg-primary text-primary-foreground shadow-primary"
                       : "glass text-muted-foreground hover:text-foreground"
@@ -709,7 +701,7 @@ const Swap = () => {
                   key={cond}
                   whileTap={{ scale: 0.9 }}
                   onClick={() => setConditionFilter(cond)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium capitalize transition-all ${
                     conditionFilter === cond
                       ? "bg-primary text-primary-foreground shadow-primary"
                       : "glass text-muted-foreground hover:text-foreground"
@@ -816,7 +808,6 @@ const Swap = () => {
             </div>
 
             <div className="flex items-center gap-3 flex-shrink-0">
-
               {compareList.length > 0 && (
                 <Button
                   size="sm"
@@ -827,9 +818,6 @@ const Swap = () => {
                   <GitCompare className="w-3.5 h-3.5 mr-1" /> Compare ({compareList.length})
                 </Button>
               )}
-              <Button size="sm" className="bg-gradient-primary text-primary-foreground text-xs">
-                <Plus className="w-3.5 h-3.5 mr-1" /> Add Points
-              </Button>
             </div>
           </div>
         </div>
@@ -952,6 +940,9 @@ const Swap = () => {
               </div>
 
               {/* Product Grid */}
+              {loading ? (
+                <div className="text-center py-20 text-muted-foreground">Loading catalog…</div>
+              ) : (
               <div ref={gridRef} className={`grid ${columnClasses[columns] || columnClasses[3]} gap-5`}>
                 {filteredItems.map((item) => (
                   <ProductCard
@@ -967,8 +958,9 @@ const Swap = () => {
                   />
                 ))}
               </div>
+              )}
 
-              {filteredItems.length === 0 && (
+              {!loading && filteredItems.length === 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
                   <Search className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
                   <p className="text-muted-foreground">No products match your filters</p>
@@ -991,7 +983,7 @@ const Swap = () => {
                   transition={{ delay: 0.3 }}
                   className="mt-16"
                 >
-                  <h2 className="text-2xl font-bold mb-6 text-foreground">Recent Transactions</h2>
+                  <h2 className="text-2xl font-bold mb-6 text-foreground">Recent Orders</h2>
                   <div className="rounded-2xl glass-lg glass-border-gradient overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full">
@@ -1004,7 +996,7 @@ const Swap = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {mockTransactions.map((t, i) => (
+                          {recentOrders.map((t, i) => (
                             <motion.tr
                               key={t.id}
                               initial={{ opacity: 0, x: -10 }}
@@ -1014,17 +1006,20 @@ const Swap = () => {
                             >
                               <td className="py-3 px-5 text-sm font-medium text-foreground">{t.itemName}</td>
                               <td className="py-3 px-5 text-sm text-primary font-semibold">
-                                {t.pointsUsed > 0 ? `${t.pointsUsed.toLocaleString()} pts` : `$${t.cashUsed}`}
+                                {t.pointsUsed > 0 ? `${t.pointsUsed.toLocaleString()} pts` : `$${t.cashUsed.toFixed(2)}`}
                               </td>
                               <td className="py-3 px-5 text-sm text-muted-foreground">{new Date(t.date).toLocaleDateString()}</td>
                               <td className="py-3 px-5">
-                                <Badge className={`text-xs ${t.status === "Completed" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
-                                  {t.status === "Completed" && <Check className="w-3 h-3 mr-1" />}
+                                <Badge className={`text-xs capitalize ${t.status === "delivered" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
+                                  {t.status === "delivered" && <Check className="w-3 h-3 mr-1" />}
                                   {t.status}
                                 </Badge>
                               </td>
                             </motion.tr>
                           ))}
+                          {recentOrders.length === 0 && (
+                            <tr><td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">No orders yet.</td></tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -1047,7 +1042,7 @@ const Swap = () => {
 
       {/* Compare Modal */}
       <ComparisonModal
-        items={swapItems.filter((i) => compareList.includes(i.id))}
+        items={items.filter((i) => compareList.includes(i.id))}
         open={showCompare}
         onClose={() => setShowCompare(false)}
         showCash={showCash}
@@ -1066,7 +1061,7 @@ const Swap = () => {
                 {(() => { const Icon = selectedItem.icon; return <Icon className="w-10 h-10 text-primary" />; })()}
                 <div className="flex-1">
                   <h4 className="font-semibold text-foreground">{selectedItem.name}</h4>
-                  <p className="text-xs text-muted-foreground">{selectedItem.condition}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{selectedItem.condition}</p>
                 </div>
               </div>
 
@@ -1085,7 +1080,7 @@ const Swap = () => {
                   className={`h-auto py-4 flex flex-col gap-1 ${paymentMethod === "cash" ? "bg-gradient-primary" : "border-border/30"}`}
                 >
                   <span className="text-xs opacity-80">Cash</span>
-                  <span className="text-lg font-bold">${selectedItem.cash}</span>
+                  <span className="text-lg font-bold">${selectedItem.cash.toFixed(2)}</span>
                 </Button>
               </div>
 
@@ -1111,11 +1106,11 @@ const Swap = () => {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="border-border/30">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={confirming} className="border-border/30">
               Cancel
             </Button>
-            <Button onClick={handleConfirmSwap} className="bg-gradient-primary text-primary-foreground">
-              <Check className="w-4 h-4 mr-1" /> Confirm
+            <Button onClick={handleConfirmSwap} disabled={confirming} className="bg-gradient-primary text-primary-foreground">
+              <Check className="w-4 h-4 mr-1" /> {confirming ? "Processing…" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

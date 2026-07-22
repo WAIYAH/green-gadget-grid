@@ -1,28 +1,16 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Trash2, Check, Mail, Smartphone, MessageSquare } from "lucide-react";
+import { Bell, Trash2, Check, Mail, Smartphone, MessageSquare, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-interface Notif {
-  id: number;
-  title: string;
-  body: string;
-  category: "Listing" | "Swap" | "Reward" | "System";
-  time: string;
-  read: boolean;
-}
-
-const SEED: Notif[] = [
-  { id: 1, title: "Listing approved", body: "Your iPhone 12 has been approved (+850 pts)", category: "Listing", time: "5m ago", read: false },
-  { id: 2, title: "Swap shipped", body: "Sony WH-1000XM4 is on its way (FDX67890)", category: "Swap", time: "1h ago", read: false },
-  { id: 3, title: "Silver tier unlocked", body: "Congratulations! You've reached Silver tier.", category: "Reward", time: "Yesterday", read: false },
-  { id: 4, title: "Pickup scheduled", body: "Pickup confirmed for Friday 2 PM.", category: "Listing", time: "2d ago", read: true },
-  { id: 5, title: "Welcome to Triple G", body: "Submit your first gadget to earn 100 bonus points!", category: "System", time: "1w ago", read: true },
-];
+type Notification = Database["public"]["Tables"]["notifications"]["Row"];
 
 const PREFS_INIT = [
   { category: "Listing updates", email: true, push: true, sms: false },
@@ -32,20 +20,62 @@ const PREFS_INIT = [
   { category: "Product announcements", email: false, push: false, sms: false },
 ];
 
-const catColor = {
-  Listing: "bg-primary/15 text-primary border-primary/30",
-  Swap: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  Reward: "bg-accent/15 text-accent border-accent/30",
-  System: "bg-muted/30 text-muted-foreground border-border/30",
+const catColor: Record<string, string> = {
+  success: "bg-primary/15 text-primary border-primary/30",
+  info: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  warning: "bg-accent/15 text-accent border-accent/30",
+  error: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
+const timeAgo = (iso: string) => {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
 };
 
 const DashboardNotifications = () => {
-  const [notifs, setNotifs] = useState<Notif[]>(SEED);
+  const { user } = useAuth();
+  const [notifs, setNotifs] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [prefs, setPrefs] = useState(PREFS_INIT);
 
-  const markAllRead = () => { setNotifs((p) => p.map((n) => ({ ...n, read: true }))); toast.success("All marked as read"); };
-  const remove = (id: number) => setNotifs((p) => p.filter((n) => n.id !== id));
-  const toggleRead = (id: number) => setNotifs((p) => p.map((n) => n.id === id ? { ...n, read: !n.read } : n));
+  const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    setNotifs(data || []);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const markAllRead = async () => {
+    if (!user) return;
+    const { error } = await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+    if (error) return toast.error(error.message);
+    toast.success("All marked as read");
+    load();
+  };
+
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("notifications").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    setNotifs((p) => p.filter((n) => n.id !== id));
+  };
+
+  const toggleRead = async (n: Notification) => {
+    const { error } = await supabase.from("notifications").update({ read: !n.read }).eq("id", n.id);
+    if (error) return toast.error(error.message);
+    setNotifs((p) => p.map((x) => x.id === n.id ? { ...x, read: !x.read } : x));
+  };
+
   const setPref = (i: number, key: "email" | "push" | "sms", v: boolean) =>
     setPrefs((p) => p.map((row, idx) => idx === i ? { ...row, [key]: v } : row));
 
@@ -60,7 +90,7 @@ const DashboardNotifications = () => {
           </h1>
           <p className="text-sm text-muted-foreground">Stay updated on your listings, swaps, and rewards.</p>
         </div>
-        <Button variant="outline" onClick={markAllRead} className="border-border/50">
+        <Button variant="outline" onClick={markAllRead} disabled={unread === 0} className="border-border/50">
           <Check className="w-4 h-4 mr-2" /> Mark all read
         </Button>
       </div>
@@ -72,6 +102,11 @@ const DashboardNotifications = () => {
             <Bell className="w-4 h-4 text-primary" />
             <h2 className="font-semibold">Inbox</h2>
           </div>
+          {loading ? (
+            <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            </div>
+          ) : (
           <div className="divide-y divide-border/10 max-h-[600px] overflow-y-auto">
             {notifs.map((n) => (
               <div key={n.id} className={`p-4 hover:bg-muted/30 transition-colors ${!n.read ? "bg-primary/5" : ""}`}>
@@ -80,13 +115,13 @@ const DashboardNotifications = () => {
                   <div className={`flex-1 min-w-0 ${n.read ? "ml-5" : ""}`}>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium text-foreground">{n.title}</p>
-                      <Badge variant="outline" className={`text-[10px] ${catColor[n.category]}`}>{n.category}</Badge>
+                      <Badge variant="outline" className={`text-[10px] capitalize ${catColor[n.type] || ""}`}>{n.type}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{n.body}</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-1">{n.time}</p>
+                    <p className="text-[11px] text-muted-foreground/60 mt-1">{timeAgo(n.created_at)}</p>
                   </div>
                   <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => toggleRead(n.id)}>
+                    <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => toggleRead(n)}>
                       <Check className="w-4 h-4" />
                     </Button>
                     <Button size="icon" variant="ghost" className="w-8 h-8 text-destructive" onClick={() => remove(n.id)}>
@@ -98,6 +133,7 @@ const DashboardNotifications = () => {
             ))}
             {notifs.length === 0 && <div className="p-8 text-center text-muted-foreground text-sm">No notifications.</div>}
           </div>
+          )}
         </Card>
 
         {/* Preferences */}

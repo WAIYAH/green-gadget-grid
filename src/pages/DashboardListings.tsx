@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card } from "@/components/ui/card";
@@ -38,16 +38,16 @@ const DashboardListings = () => {
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     const { data, error } = await supabase.from("gadgets").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
     if (error) toast.error(error.message);
     setItems((data as Listing[]) || []);
     setLoading(false);
-  };
+  }, [user]);
 
-  useEffect(() => { load(); }, [user]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = items.filter(
     (i) =>

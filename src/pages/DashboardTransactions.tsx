@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,48 +6,51 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Search, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Download, Search, ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-interface Tx {
-  id: string;
-  type: "Earning" | "Redemption" | "Swap" | "Refund";
-  description: string;
-  amount: number;
-  date: string;
-  status: "Completed" | "Pending" | "Failed";
-}
+type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 
-const TX: Tx[] = [
-  { id: "TX-1041", type: "Earning", description: "iPhone 12 — Approved", amount: 850, date: "2025-12-15", status: "Completed" },
-  { id: "TX-1040", type: "Redemption", description: "Amazon Gift Card $25", amount: -2500, date: "2025-12-12", status: "Completed" },
-  { id: "TX-1039", type: "Swap", description: "Sony WH-1000XM4", amount: -1800, date: "2025-12-08", status: "Completed" },
-  { id: "TX-1038", type: "Earning", description: "MacBook Air — Sold", amount: 1800, date: "2025-11-10", status: "Completed" },
-  { id: "TX-1037", type: "Earning", description: "AirPods Pro — Approved", amount: 480, date: "2025-11-28", status: "Completed" },
-  { id: "TX-1036", type: "Refund", description: "Cancelled swap refund", amount: 320, date: "2025-11-04", status: "Pending" },
-  { id: "TX-1035", type: "Earning", description: "Pickup bonus", amount: 100, date: "2025-10-30", status: "Completed" },
-];
-
-const statusColor = {
-  Completed: "bg-primary/15 text-primary border-primary/30",
-  Pending: "bg-accent/15 text-accent border-accent/30",
-  Failed: "bg-destructive/15 text-destructive border-destructive/30",
+const statusColor: Record<string, string> = {
+  completed: "bg-primary/15 text-primary border-primary/30",
+  pending: "bg-accent/15 text-accent border-accent/30",
+  failed: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
 const DashboardTransactions = () => {
+  const { user } = useAuth();
+  const [tx, setTx] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("All");
 
-  const filtered = TX.filter(
-    (t) => (filter === "All" || t.type === filter) && (t.description.toLowerCase().includes(q.toLowerCase()) || t.id.includes(q))
+  const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase.from("transactions").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    setTx(data || []);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = tx.filter(
+    (t) => (filter === "All" || t.type === filter.toLowerCase()) &&
+      (t.description || "").toLowerCase().includes(q.toLowerCase())
   );
 
-  const totalEarned = TX.filter((t) => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const totalSpent = Math.abs(TX.filter((t) => t.amount < 0).reduce((s, t) => s + t.amount, 0));
-  const net = totalEarned - totalSpent;
+  const { totalEarned, totalSpent, net } = useMemo(() => {
+    const earned = tx.filter((t) => t.points > 0).reduce((s, t) => s + t.points, 0);
+    const spent = Math.abs(tx.filter((t) => t.points < 0).reduce((s, t) => s + t.points, 0));
+    return { totalEarned: earned, totalSpent: spent, net: earned - spent };
+  }, [tx]);
 
   const exportCsv = () => {
-    const csv = ["ID,Type,Description,Amount,Date,Status", ...TX.map((t) => `${t.id},${t.type},"${t.description}",${t.amount},${t.date},${t.status}`)].join("\n");
+    const csv = ["ID,Type,Description,Points,Amount,Date,Status", ...tx.map((t) => `${t.id},${t.type},"${t.description || ""}",${t.points},${t.amount},${t.created_at},${t.status}`)].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -61,7 +64,7 @@ const DashboardTransactions = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-bold">Transaction History</h1>
-          <p className="text-sm text-muted-foreground">All earnings, redemptions, swaps, and refunds in one place.</p>
+          <p className="text-sm text-muted-foreground">All earnings, redemptions, and purchases in one place.</p>
         </div>
         <Button onClick={exportCsv} variant="outline" className="border-border/50">
           <Download className="w-4 h-4 mr-2" /> Export CSV
@@ -98,19 +101,23 @@ const DashboardTransactions = () => {
               <TabsTrigger value="All">All</TabsTrigger>
               <TabsTrigger value="Earning">Earnings</TabsTrigger>
               <TabsTrigger value="Redemption">Redemptions</TabsTrigger>
-              <TabsTrigger value="Swap">Swaps</TabsTrigger>
+              <TabsTrigger value="Purchase">Purchases</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
 
+        {loading ? (
+          <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading transactions…
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Amount</TableHead>
+                <TableHead>Points</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
@@ -118,22 +125,22 @@ const DashboardTransactions = () => {
             <TableBody>
               {filtered.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{t.id}</TableCell>
-                  <TableCell><Badge variant="outline" className="border-border/40">{t.type}</Badge></TableCell>
-                  <TableCell className="text-foreground">{t.description}</TableCell>
-                  <TableCell className={`font-semibold ${t.amount > 0 ? "text-primary" : "text-destructive"}`}>
-                    {t.amount > 0 ? "+" : ""}{t.amount.toLocaleString()} pts
+                  <TableCell><Badge variant="outline" className="border-border/40 capitalize">{t.type}</Badge></TableCell>
+                  <TableCell className="text-foreground">{t.description || "-"}</TableCell>
+                  <TableCell className={`font-semibold ${t.points > 0 ? "text-primary" : t.points < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                    {t.points > 0 ? "+" : ""}{t.points.toLocaleString()} pts
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(t.date).toLocaleDateString()}</TableCell>
-                  <TableCell><Badge variant="outline" className={statusColor[t.status]}>{t.status}</Badge></TableCell>
+                  <TableCell className="text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell><Badge variant="outline" className={`capitalize ${statusColor[t.status] || ""}`}>{t.status}</Badge></TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No transactions found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No transactions found.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </div>
+        )}
       </Card>
     </DashboardLayout>
   );
