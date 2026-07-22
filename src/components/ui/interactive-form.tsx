@@ -124,17 +124,13 @@ export const AutoExpandTextarea = React.forwardRef<HTMLTextAreaElement, AutoExpa
     const textareaRef = (ref as React.RefObject<HTMLTextAreaElement>) || internalRef;
     const charCount = typeof value === "string" ? value.length : 0;
 
-    const autoResize = () => {
+    useEffect(() => {
       const el = textareaRef.current;
       if (el) {
         el.style.height = "auto";
         el.style.height = `${el.scrollHeight}px`;
       }
-    };
-
-    useEffect(() => {
-      autoResize();
-    }, [value]);
+    }, [value, textareaRef]);
 
     return (
       <div className="relative">

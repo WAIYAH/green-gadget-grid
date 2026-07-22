@@ -263,6 +263,41 @@ interface ParallaxParticlesProps {
   className?: string;
 }
 
+interface Particle {
+  x: number;
+  y: number;
+  size: number;
+  speed: number;
+  delay: number;
+  duration: number;
+}
+
+const ParallaxParticle = ({ particle: p, scrollYProgress }: { particle: Particle; scrollYProgress: MotionValue<number> }) => {
+  const y = useTransform(scrollYProgress, [0, 1], [p.speed * 80, -p.speed * 80]);
+  return (
+    <motion.div
+      className="absolute rounded-full bg-primary/20"
+      style={{
+        left: `${p.x}%`,
+        top: `${p.y}%`,
+        width: p.size,
+        height: p.size,
+        y,
+      }}
+      animate={{
+        opacity: [0, 0.6, 0],
+        scale: [0.5, 1, 0.5],
+      }}
+      transition={{
+        duration: p.duration,
+        repeat: Infinity,
+        delay: p.delay,
+        ease: "easeInOut",
+      }}
+    />
+  );
+};
+
 export const ParallaxParticles = ({ count = 20, className }: ParallaxParticlesProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -285,32 +320,9 @@ export const ParallaxParticles = ({ count = 20, className }: ParallaxParticlesPr
 
   return (
     <div ref={ref} className={cn("absolute inset-0 pointer-events-none overflow-hidden", className)}>
-      {particles.map((p, i) => {
-        const y = useTransform(scrollYProgress, [0, 1], [p.speed * 80, -p.speed * 80]);
-        return (
-          <motion.div
-            key={i}
-            className="absolute rounded-full bg-primary/20"
-            style={{
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              width: p.size,
-              height: p.size,
-              y,
-            }}
-            animate={{
-              opacity: [0, 0.6, 0],
-              scale: [0.5, 1, 0.5],
-            }}
-            transition={{
-              duration: p.duration,
-              repeat: Infinity,
-              delay: p.delay,
-              ease: "easeInOut",
-            }}
-          />
-        );
-      })}
+      {particles.map((p, i) => (
+        <ParallaxParticle key={i} particle={p} scrollYProgress={scrollYProgress} />
+      ))}
     </div>
   );
 };
