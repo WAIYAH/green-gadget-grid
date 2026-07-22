@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,32 +13,43 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingBag, Plus, Search, Edit, Trash2, Package, TrendingUp,
-  CheckCircle2, Clock, XCircle, Award, ArrowUpDown, Star,
+  CheckCircle2, Clock, XCircle, Award, ArrowUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+
+type SwapItemRow = Database["public"]["Tables"]["swap_items"]["Row"];
 
 interface SwapItem {
   id: string;
   name: string;
   category: string;
   points: number;
+  cashPrice: number;
   stock: number;
   status: "available" | "low" | "out" | "draft";
-  condition: "new" | "refurbished" | "used";
+  condition: string;
   description: string;
   image: string;
-  rating: number;
   swaps: number;
   date: string;
 }
 
-const initialItems: SwapItem[] = [
-  { id: "1", name: "Refurbished MacBook Air", category: "Laptops", points: 8500, stock: 4, status: "available", condition: "refurbished", description: "M1 chip, 8GB RAM, 256GB SSD. Fully tested.", image: "/placeholder.svg", rating: 4.8, swaps: 23, date: "2025-01-10" },
-  { id: "2", name: "Wireless Eco Mouse", category: "Accessories", points: 450, stock: 2, status: "low", condition: "new", description: "Made from recycled plastics.", image: "/placeholder.svg", rating: 4.5, swaps: 87, date: "2025-01-08" },
-  { id: "3", name: "iPhone 12 Pro (Refurb)", category: "Phones", points: 6200, stock: 0, status: "out", condition: "refurbished", description: "128GB, Pacific Blue. Battery health 92%.", image: "/placeholder.svg", rating: 4.7, swaps: 41, date: "2025-01-05" },
-  { id: "4", name: "USB-C Hub", category: "Accessories", points: 800, stock: 15, status: "available", condition: "new", description: "7-in-1 hub with HDMI, USB 3.0, SD card reader.", image: "/placeholder.svg", rating: 4.6, swaps: 134, date: "2025-01-03" },
-  { id: "5", name: "Mechanical Keyboard", category: "Accessories", points: 2400, stock: 0, status: "draft", condition: "new", description: "RGB backlit, hot-swappable switches.", image: "/placeholder.svg", rating: 0, swaps: 0, date: "2025-01-12" },
-];
+const fromRow = (row: SwapItemRow, swapCounts: Map<string, number>): SwapItem => ({
+  id: row.id,
+  name: row.name,
+  category: row.category,
+  points: row.points_price,
+  cashPrice: row.cash_price,
+  stock: row.stock,
+  status: (row.status as SwapItem["status"]) || "available",
+  condition: row.condition,
+  description: row.description || "",
+  image: row.image_url || "/placeholder.svg",
+  swaps: swapCounts.get(row.id) || 0,
+  date: row.created_at.split("T")[0],
+});
 
 const CATEGORIES = ["Laptops", "Phones", "Accessories", "Tablets", "Components"];
 
@@ -49,24 +60,43 @@ const statusConfig = {
   draft: { label: "Draft", color: "bg-muted/40 text-muted-foreground", icon: Edit },
 };
 
-const stats = [
-  { label: "Listings", value: "124", icon: ShoppingBag },
-  { label: "Total Swaps", value: "2,840", icon: ArrowUpDown },
-  { label: "Avg Rating", value: "4.7", icon: Star },
-  { label: "Points Issued", value: "98K", icon: Award },
-];
-
 const AdminSwaps = () => {
-  const [items, setItems] = useState<SwapItem[]>(initialItems);
+  const [items, setItems] = useState<SwapItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
   const [editing, setEditing] = useState<SwapItem | null>(null);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    name: "", category: CATEGORIES[0], points: 0, stock: 0,
-    status: "available" as SwapItem["status"], condition: "new" as SwapItem["condition"],
+    name: "", category: CATEGORIES[0], points: 0, cashPrice: 0, stock: 0,
+    status: "available" as SwapItem["status"], condition: "new",
     description: "", image: "/placeholder.svg",
   });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [{ data: rows, error }, { data: swaps }] = await Promise.all([
+      supabase.from("swap_items").select("*").order("created_at", { ascending: false }),
+      supabase.from("swaps").select("item_id"),
+    ]);
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    const swapCounts = new Map<string, number>();
+    (swaps || []).forEach((s) => {
+      if (s.item_id) swapCounts.set(s.item_id, (swapCounts.get(s.item_id) || 0) + 1);
+    });
+    setItems((rows || []).map((r) => fromRow(r, swapCounts)));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const stats = useMemo(() => [
+    { label: "Listings", value: String(items.length), icon: ShoppingBag },
+    { label: "Total Swaps", value: String(items.reduce((s, i) => s + i.swaps, 0)), icon: ArrowUpDown },
+    { label: "Available", value: String(items.filter((i) => i.status === "available").length), icon: CheckCircle2 },
+    { label: "Points Value", value: items.reduce((s, i) => s + i.points, 0).toLocaleString(), icon: Award },
+  ], [items]);
 
   const filtered = items.filter((i) => {
     const matchSearch = i.name.toLowerCase().includes(search.toLowerCase());
@@ -77,7 +107,7 @@ const AdminSwaps = () => {
   const openNew = () => {
     setEditing(null);
     setForm({
-      name: "", category: CATEGORIES[0], points: 0, stock: 0,
+      name: "", category: CATEGORIES[0], points: 0, cashPrice: 0, stock: 0,
       status: "available", condition: "new", description: "", image: "/placeholder.svg",
     });
     setOpen(true);
@@ -86,37 +116,44 @@ const AdminSwaps = () => {
   const openEdit = (item: SwapItem) => {
     setEditing(item);
     setForm({
-      name: item.name, category: item.category, points: item.points, stock: item.stock,
+      name: item.name, category: item.category, points: item.points, cashPrice: item.cashPrice, stock: item.stock,
       status: item.status, condition: item.condition, description: item.description, image: item.image,
     });
     setOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.name) {
       toast.error("Name is required");
       return;
     }
-    if (editing) {
-      setItems((prev) => prev.map((i) => (i.id === editing.id ? { ...i, ...form } : i)));
-      toast.success("Item updated");
-    } else {
-      const newItem: SwapItem = {
-        ...form,
-        id: Date.now().toString(),
-        rating: 0,
-        swaps: 0,
-        date: new Date().toISOString().split("T")[0],
-      };
-      setItems((prev) => [newItem, ...prev]);
-      toast.success("Item created");
-    }
+    setSaving(true);
+    const payload = {
+      name: form.name,
+      category: form.category,
+      points_price: form.points,
+      cash_price: form.cashPrice,
+      stock: form.stock,
+      status: form.status,
+      condition: form.condition,
+      description: form.description,
+      image_url: form.image,
+    };
+    const { error } = editing
+      ? await supabase.from("swap_items").update(payload).eq("id", editing.id)
+      : await supabase.from("swap_items").insert(payload);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(editing ? "Item updated" : "Item created");
     setOpen(false);
+    load();
   };
 
-  const remove = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("swap_items").delete().eq("id", id);
+    if (error) return toast.error(error.message);
     toast.success("Item deleted");
+    load();
   };
 
   return (
@@ -180,6 +217,9 @@ const AdminSwaps = () => {
             const list = tab === "all" ? filtered : filtered.filter((i) => i.status === tab);
             return (
               <TabsContent key={tab} value={tab} className="mt-6">
+                {loading ? (
+                  <div className="text-center py-12 text-muted-foreground">Loading…</div>
+                ) : (
                 <div className="border border-border/50 rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-muted/30">
@@ -228,11 +268,6 @@ const AdminSwaps = () => {
                               </td>
                               <td className="p-3">
                                 <div className="text-sm text-foreground">{item.swaps}</div>
-                                {item.rating > 0 && (
-                                  <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                    <Star className="w-3 h-3 fill-accent text-accent" />{item.rating}
-                                  </div>
-                                )}
                               </td>
                               <td className="p-3">
                                 <div className="flex gap-1">
@@ -251,7 +286,8 @@ const AdminSwaps = () => {
                     </tbody>
                   </table>
                 </div>
-                {list.length === 0 && (
+                )}
+                {!loading && list.length === 0 && (
                   <div className="text-center py-12 text-muted-foreground">
                     <ShoppingBag className="w-10 h-10 mx-auto mb-2 opacity-40" />
                     <p>No items found</p>
@@ -286,7 +322,7 @@ const AdminSwaps = () => {
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Condition</label>
-                <Select value={form.condition} onValueChange={(v: SwapItem["condition"]) => setForm({ ...form, condition: v })}>
+                <Select value={form.condition} onValueChange={(v) => setForm({ ...form, condition: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="new">New</SelectItem>
@@ -302,21 +338,25 @@ const AdminSwaps = () => {
                 <Input type="number" value={form.points} onChange={(e) => setForm({ ...form, points: Number(e.target.value) })} />
               </div>
               <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Cash Price ($)</label>
+                <Input type="number" value={form.cashPrice} onChange={(e) => setForm({ ...form, cashPrice: Number(e.target.value) })} />
+              </div>
+              <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Stock</label>
                 <Input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })} />
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Status</label>
-                <Select value={form.status} onValueChange={(v: SwapItem["status"]) => setForm({ ...form, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="available">Available</SelectItem>
-                    <SelectItem value="low">Low Stock</SelectItem>
-                    <SelectItem value="out">Out of Stock</SelectItem>
-                    <SelectItem value="draft">Draft</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Status</label>
+              <Select value={form.status} onValueChange={(v: SwapItem["status"]) => setForm({ ...form, status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">Available</SelectItem>
+                  <SelectItem value="low">Low Stock</SelectItem>
+                  <SelectItem value="out">Out of Stock</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Description</label>
@@ -324,9 +364,9 @@ const AdminSwaps = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} className="bg-gradient-primary text-primary-foreground">
-              {editing ? "Update" : "Create"}
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={save} disabled={saving} className="bg-gradient-primary text-primary-foreground">
+              {saving ? "Saving…" : editing ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

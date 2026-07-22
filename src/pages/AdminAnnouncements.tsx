@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Megaphone, Plus, Edit, Trash2, Send, Calendar, Users, Eye,
+  Megaphone, Plus, Edit, Trash2, Send, Calendar,
   AlertCircle, Info, CheckCircle2, Sparkles, Pin, Archive,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import type { Database } from "@/integrations/supabase/types";
+
+type AnnouncementRow = Database["public"]["Tables"]["announcements"]["Row"];
 
 interface Announcement {
   id: string;
@@ -27,17 +32,29 @@ interface Announcement {
   status: "draft" | "scheduled" | "published" | "archived";
   pinned: boolean;
   date: string;
-  views: number;
-  reach: number;
 }
 
-const initial: Announcement[] = [
-  { id: "1", title: "New Swap Categories Launched", message: "We've added tablets and components to our swap platform.", type: "feature", audience: "all", status: "published", pinned: true, date: "2025-01-12", views: 4520, reach: 8200 },
-  { id: "2", title: "Scheduled Maintenance Notice", message: "System maintenance on Jan 20 from 2-4 AM UTC.", type: "warning", audience: "all", status: "scheduled", pinned: false, date: "2025-01-20", views: 0, reach: 8200 },
-  { id: "3", title: "Holiday Reward Bonus", message: "Earn 2x points on all submissions this weekend!", type: "success", audience: "users", status: "published", pinned: false, date: "2025-01-10", views: 6890, reach: 7400 },
-  { id: "4", title: "Admin Dashboard Update", message: "New analytics tools available in the dashboard.", type: "info", audience: "admins", status: "published", pinned: false, date: "2025-01-08", views: 47, reach: 50 },
-  { id: "5", title: "Q1 Roadmap Preview", message: "Draft preview of upcoming features.", type: "feature", audience: "premium", status: "draft", pinned: false, date: "2025-01-14", views: 0, reach: 0 },
-];
+const fromRow = (row: AnnouncementRow): Announcement => {
+  const now = Date.now();
+  const publishedAt = row.published_at ? new Date(row.published_at).getTime() : null;
+  const status: Announcement["status"] = row.archived
+    ? "archived"
+    : publishedAt === null
+    ? "draft"
+    : publishedAt > now
+    ? "scheduled"
+    : "published";
+  return {
+    id: row.id,
+    title: row.title,
+    message: row.body,
+    type: (row.type as Announcement["type"]) || "info",
+    audience: (row.audience as Announcement["audience"]) || "all",
+    status,
+    pinned: row.pinned,
+    date: (row.published_at || row.created_at).split("T")[0],
+  };
+};
 
 const typeConfig = {
   info: { color: "bg-primary/15 text-primary", icon: Info },
@@ -54,8 +71,11 @@ const statusConfig = {
 };
 
 const AdminAnnouncements = () => {
-  const [items, setItems] = useState<Announcement[]>(initial);
+  const { user } = useAuth();
+  const [items, setItems] = useState<Announcement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<Announcement | null>(null);
   const [form, setForm] = useState({
     title: "", message: "", type: "info" as Announcement["type"],
@@ -63,12 +83,22 @@ const AdminAnnouncements = () => {
     schedule: false, scheduleDate: "",
   });
 
-  const stats = [
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("announcements").select("*").order("created_at", { ascending: false });
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    setItems((data || []).map(fromRow));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const stats = useMemo(() => [
     { label: "Active", value: items.filter((i) => i.status === "published").length, icon: Megaphone },
     { label: "Scheduled", value: items.filter((i) => i.status === "scheduled").length, icon: Calendar },
-    { label: "Total Reach", value: items.reduce((a, b) => a + b.reach, 0).toLocaleString(), icon: Users },
-    { label: "Total Views", value: items.reduce((a, b) => a + b.views, 0).toLocaleString(), icon: Eye },
-  ];
+    { label: "Drafts", value: items.filter((i) => i.status === "draft").length, icon: Edit },
+    { label: "Archived", value: items.filter((i) => i.status === "archived").length, icon: Archive },
+  ], [items]);
 
   const openNew = () => {
     setEditing(null);
@@ -85,42 +115,51 @@ const AdminAnnouncements = () => {
     setOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.title || !form.message) {
       toast.error("Title and message are required");
       return;
     }
-    const status: Announcement["status"] = form.schedule ? "scheduled" : "published";
-    if (editing) {
-      setItems((p) => p.map((i) => (i.id === editing.id ? { ...i, ...form, status } : i)));
-      toast.success("Announcement updated");
-    } else {
-      const item: Announcement = {
-        ...form,
-        id: Date.now().toString(),
-        status,
-        date: form.scheduleDate || new Date().toISOString().split("T")[0],
-        views: 0,
-        reach: form.audience === "admins" ? 50 : form.audience === "premium" ? 1200 : 8200,
-      };
-      setItems((p) => [item, ...p]);
-      toast.success(form.schedule ? "Announcement scheduled" : "Announcement published");
-    }
+    setSaving(true);
+    const publishedAt = form.schedule
+      ? (form.scheduleDate ? new Date(form.scheduleDate).toISOString() : new Date().toISOString())
+      : new Date().toISOString();
+    const payload = {
+      title: form.title,
+      body: form.message,
+      type: form.type,
+      audience: form.audience,
+      pinned: form.pinned,
+      published_at: publishedAt,
+    };
+    const { error } = editing
+      ? await supabase.from("announcements").update(payload).eq("id", editing.id)
+      : await supabase.from("announcements").insert({ ...payload, created_by: user?.id, archived: false });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(editing ? "Announcement updated" : form.schedule ? "Announcement scheduled" : "Announcement published");
     setOpen(false);
+    load();
   };
 
-  const remove = (id: string) => {
-    setItems((p) => p.filter((i) => i.id !== id));
+  const remove = async (id: string) => {
+    const { error } = await supabase.from("announcements").delete().eq("id", id);
+    if (error) return toast.error(error.message);
     toast.success("Announcement deleted");
+    load();
   };
 
-  const togglePin = (id: string) => {
-    setItems((p) => p.map((i) => (i.id === id ? { ...i, pinned: !i.pinned } : i)));
+  const togglePin = async (id: string, pinned: boolean) => {
+    const { error } = await supabase.from("announcements").update({ pinned: !pinned }).eq("id", id);
+    if (error) return toast.error(error.message);
+    load();
   };
 
-  const archive = (id: string) => {
-    setItems((p) => p.map((i) => (i.id === id ? { ...i, status: "archived" as const } : i)));
+  const archive = async (id: string) => {
+    const { error } = await supabase.from("announcements").update({ archived: true }).eq("id", id);
+    if (error) return toast.error(error.message);
     toast.success("Archived");
+    load();
   };
 
   return (
@@ -186,12 +225,10 @@ const AdminAnnouncements = () => {
                               <p className="text-sm text-muted-foreground mb-2">{a.message}</p>
                               <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
                                 <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{a.date}</span>
-                                <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{a.views.toLocaleString()} views</span>
-                                <span className="flex items-center gap-1"><Users className="w-3 h-3" />{a.reach.toLocaleString()} reach</span>
                               </div>
                             </div>
                             <div className="flex flex-col gap-1 shrink-0">
-                              <Button size="sm" variant="ghost" onClick={() => togglePin(a.id)} title="Pin">
+                              <Button size="sm" variant="ghost" onClick={() => togglePin(a.id, a.pinned)} title="Pin">
                                 <Pin className={`w-3.5 h-3.5 ${a.pinned ? "text-accent fill-accent" : ""}`} />
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => openEdit(a)}>
@@ -212,7 +249,9 @@ const AdminAnnouncements = () => {
                     );
                   })}
                 </AnimatePresence>
-                {sorted.length === 0 && (
+                {loading ? (
+                  <div className="text-center py-12 text-muted-foreground">Loading…</div>
+                ) : sorted.length === 0 && (
                   <div className="text-center py-12 text-muted-foreground">
                     <Megaphone className="w-10 h-10 mx-auto mb-2 opacity-40" />
                     <p>No announcements</p>
@@ -285,9 +324,9 @@ const AdminAnnouncements = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} className="bg-gradient-primary text-primary-foreground gap-2">
-              <Send className="w-4 h-4" />{form.schedule ? "Schedule" : editing ? "Update" : "Publish"}
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={save} disabled={saving} className="bg-gradient-primary text-primary-foreground gap-2">
+              <Send className="w-4 h-4" />{saving ? "Saving…" : form.schedule ? "Schedule" : editing ? "Update" : "Publish"}
             </Button>
           </DialogFooter>
         </DialogContent>

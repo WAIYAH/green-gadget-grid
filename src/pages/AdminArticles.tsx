@@ -31,11 +31,12 @@ const stats = [
 ];
 
 const AdminArticles = () => {
-  const { content, addContent, updateContent, deleteContent } = useAwareness();
+  const { content, loading, addContent, updateContent, deleteContent } = useAwareness();
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
   const [editing, setEditing] = useState<ContentItem | null>(null);
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     title: "", category: CATEGORIES[0], description: "", content: "",
     author: "", type: "article" as ContentItem["type"], thumbnail: "/placeholder.svg",
@@ -66,23 +67,25 @@ const AdminArticles = () => {
     setOpen(true);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!form.title || !form.author) {
       toast.error("Title and author are required");
       return;
     }
+    setSaving(true);
     if (editing) {
-      updateContent(editing.id, form);
+      await updateContent(editing.id, form);
       toast.success("Article updated");
     } else {
-      addContent({ ...form, date: new Date().toISOString().split("T")[0] });
+      await addContent({ ...form, date: new Date().toISOString().split("T")[0] });
       toast.success("Article created");
     }
+    setSaving(false);
     setOpen(false);
   };
 
-  const remove = (id: string) => {
-    deleteContent(id);
+  const remove = async (id: string) => {
+    await deleteContent(id);
     toast.success("Article deleted");
   };
 
@@ -188,7 +191,9 @@ const AdminArticles = () => {
                     ))}
                   </AnimatePresence>
                 </div>
-                {items.length === 0 && (
+                {loading ? (
+                  <div className="text-center py-12 text-muted-foreground">Loading…</div>
+                ) : items.length === 0 && (
                   <div className="text-center py-12 text-muted-foreground">
                     <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
                     <p>No content found</p>
@@ -247,9 +252,9 @@ const AdminArticles = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={save} className="bg-gradient-primary text-primary-foreground">
-              {editing ? "Update" : "Create"}
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button onClick={save} disabled={saving} className="bg-gradient-primary text-primary-foreground">
+              {saving ? "Saving…" : editing ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,38 +8,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Wallet, Search, Download, Send, Clock, CheckCircle2, XCircle,
-  TrendingUp, DollarSign, Users, Calendar, ArrowUpRight,
+  Wallet, Search, Clock, CheckCircle2, XCircle,
+  DollarSign, Users, ArrowUpRight,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-interface Payout {
-  id: string;
-  recipient: string;
-  email: string;
-  amount: number;
-  method: "bank" | "paypal" | "crypto";
-  status: "pending" | "processing" | "completed" | "failed";
-  date: string;
-  batch: string;
-}
+type Payout = Database["public"]["Tables"]["payouts"]["Row"];
+type Profile = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "full_name" | "email">;
 
-const initial: Payout[] = [
-  { id: "PO-1024", recipient: "John Doe", email: "john@example.com", amount: 245.50, method: "bank", status: "completed", date: "2025-01-12", batch: "B-12" },
-  { id: "PO-1025", recipient: "Jane Smith", email: "jane@example.com", amount: 89.20, method: "paypal", status: "processing", date: "2025-01-13", batch: "B-12" },
-  { id: "PO-1026", recipient: "Mike Chen", email: "mike@example.com", amount: 412.00, method: "bank", status: "pending", date: "2025-01-13", batch: "B-13" },
-  { id: "PO-1027", recipient: "Sara Lee", email: "sara@example.com", amount: 56.75, method: "crypto", status: "failed", date: "2025-01-11", batch: "B-11" },
-  { id: "PO-1028", recipient: "Alex Park", email: "alex@example.com", amount: 178.90, method: "paypal", status: "completed", date: "2025-01-10", batch: "B-11" },
-];
-
-const stats = [
-  { label: "Pending", value: "$3,240", icon: Clock, color: "text-accent" },
-  { label: "Processed (MTD)", value: "$24.8K", icon: CheckCircle2, color: "text-primary" },
-  { label: "Recipients", value: "184", icon: Users, color: "text-primary" },
-  { label: "Avg Payout", value: "$135", icon: DollarSign, color: "text-primary" },
-];
-
-const statusConfig = {
+const statusConfig: Record<Payout["status"], { color: string; icon: typeof CheckCircle2 }> = {
   pending: { color: "bg-accent/15 text-accent", icon: Clock },
   processing: { color: "bg-primary/15 text-primary", icon: ArrowUpRight },
   completed: { color: "bg-primary/15 text-primary", icon: CheckCircle2 },
@@ -47,20 +26,61 @@ const statusConfig = {
 };
 
 const AdminPayouts = () => {
-  const [payouts, setPayouts] = useState<Payout[]>(initial);
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({});
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterMethod, setFilterMethod] = useState("all");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("payouts").select("*").order("created_at", { ascending: false });
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    const rows = data || [];
+    setPayouts(rows);
+    const userIds = Array.from(new Set(rows.map((p) => p.user_id)));
+    if (userIds.length) {
+      const { data: profileRows } = await supabase.from("profiles").select("id, full_name, email").in("id", userIds);
+      const map: Record<string, Profile> = {};
+      (profileRows || []).forEach((p) => { map[p.id] = p; });
+      setProfiles(map);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const filtered = payouts.filter((p) => {
-    const matchSearch = p.recipient.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase());
+    const recipient = profiles[p.user_id];
+    const q = search.toLowerCase();
+    const matchSearch = (recipient?.full_name || "").toLowerCase().includes(q) || (recipient?.email || "").toLowerCase().includes(q) || p.id.toLowerCase().includes(q);
     const matchMethod = filterMethod === "all" || p.method === filterMethod;
     return matchSearch && matchMethod;
   });
 
-  const runBatch = () => toast.success("Payout batch scheduled");
-  const approve = (id: string) => {
-    setPayouts((prev) => prev.map((p) => (p.id === id ? { ...p, status: "processing" as const } : p)));
-    toast.success(`${id} approved`);
+  const stats = useMemo(() => {
+    const pending = payouts.filter((p) => p.status === "pending").reduce((s, p) => s + Number(p.amount), 0);
+    const completed = payouts.filter((p) => p.status === "completed").reduce((s, p) => s + Number(p.amount), 0);
+    const recipients = new Set(payouts.map((p) => p.user_id)).size;
+    const avg = payouts.length ? payouts.reduce((s, p) => s + Number(p.amount), 0) / payouts.length : 0;
+    return [
+      { label: "Pending", value: `$${pending.toFixed(2)}`, icon: Clock, color: "text-accent" },
+      { label: "Completed", value: `$${completed.toFixed(2)}`, icon: CheckCircle2, color: "text-primary" },
+      { label: "Recipients", value: String(recipients), icon: Users, color: "text-primary" },
+      { label: "Avg Payout", value: `$${avg.toFixed(2)}`, icon: DollarSign, color: "text-primary" },
+    ];
+  }, [payouts]);
+
+  const setStatus = async (id: string, status: Payout["status"]) => {
+    setBusyId(id);
+    const payload: { status: Payout["status"]; processed_at?: string } = { status };
+    if (status === "completed" || status === "failed") payload.processed_at = new Date().toISOString();
+    const { error } = await supabase.from("payouts").update(payload).eq("id", id);
+    setBusyId(null);
+    if (error) return toast.error(error.message);
+    toast.success(`Payout marked ${status}`);
+    load();
   };
 
   return (
@@ -68,13 +88,7 @@ const AdminPayouts = () => {
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Payouts</h1>
-          <p className="text-sm text-muted-foreground">Manage user payouts and batch transfers</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2"><Download className="w-4 h-4" />Export</Button>
-          <Button onClick={runBatch} className="bg-gradient-primary text-primary-foreground gap-2">
-            <Send className="w-4 h-4" />Run Batch
-          </Button>
+          <p className="text-sm text-muted-foreground">Manage user cash payout requests</p>
         </div>
       </div>
 
@@ -125,15 +139,17 @@ const AdminPayouts = () => {
             const list = tab === "all" ? filtered : filtered.filter((p) => p.status === tab);
             return (
               <TabsContent key={tab} value={tab} className="mt-6">
+                {loading ? (
+                  <div className="text-center py-12 text-muted-foreground">Loading…</div>
+                ) : (
                 <div className="border border-border/50 rounded-lg overflow-hidden">
                   <table className="w-full">
                     <thead className="bg-muted/30">
                       <tr>
-                        <th className="text-left p-3 text-xs text-muted-foreground font-medium">Payout ID</th>
                         <th className="text-left p-3 text-xs text-muted-foreground font-medium">Recipient</th>
                         <th className="text-left p-3 text-xs text-muted-foreground font-medium">Amount</th>
                         <th className="text-left p-3 text-xs text-muted-foreground font-medium">Method</th>
-                        <th className="text-left p-3 text-xs text-muted-foreground font-medium">Batch</th>
+                        <th className="text-left p-3 text-xs text-muted-foreground font-medium">Destination</th>
                         <th className="text-left p-3 text-xs text-muted-foreground font-medium">Status</th>
                         <th className="text-left p-3 text-xs text-muted-foreground font-medium">Actions</th>
                       </tr>
@@ -143,27 +159,31 @@ const AdminPayouts = () => {
                         {list.map((p) => {
                           const sc = statusConfig[p.status];
                           const SIcon = sc.icon;
+                          const recipient = profiles[p.user_id];
                           return (
                             <motion.tr key={p.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                               className="border-t border-border/30 hover:bg-muted/20 transition-colors">
-                              <td className="p-3 text-sm font-mono text-foreground">{p.id}</td>
                               <td className="p-3">
-                                <div className="text-sm font-medium text-foreground">{p.recipient}</div>
-                                <div className="text-[11px] text-muted-foreground">{p.email}</div>
+                                <div className="text-sm font-medium text-foreground">{recipient?.full_name || "—"}</div>
+                                <div className="text-[11px] text-muted-foreground">{recipient?.email}</div>
                               </td>
-                              <td className="p-3 text-sm font-medium text-foreground">${p.amount.toFixed(2)}</td>
+                              <td className="p-3 text-sm font-medium text-foreground">${Number(p.amount).toFixed(2)}</td>
                               <td className="p-3 text-sm text-muted-foreground capitalize">{p.method}</td>
-                              <td className="p-3 text-sm text-muted-foreground">{p.batch}</td>
+                              <td className="p-3 text-sm text-muted-foreground">{p.destination || "-"}</td>
                               <td className="p-3">
                                 <Badge className={`${sc.color} border-0 gap-1 capitalize`}>
                                   <SIcon className="w-3 h-3" />{p.status}
                                 </Badge>
                               </td>
                               <td className="p-3">
-                                {p.status === "pending" ? (
-                                  <Button size="sm" variant="outline" onClick={() => approve(p.id)}>Approve</Button>
-                                ) : (
-                                  <Button size="sm" variant="outline">View</Button>
+                                {p.status === "pending" && (
+                                  <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => setStatus(p.id, "processing")}>Approve</Button>
+                                )}
+                                {p.status === "processing" && (
+                                  <div className="flex gap-1">
+                                    <Button size="sm" variant="outline" disabled={busyId === p.id} onClick={() => setStatus(p.id, "completed")}>Complete</Button>
+                                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30" disabled={busyId === p.id} onClick={() => setStatus(p.id, "failed")}>Fail</Button>
+                                  </div>
                                 )}
                               </td>
                             </motion.tr>
@@ -173,7 +193,8 @@ const AdminPayouts = () => {
                     </tbody>
                   </table>
                 </div>
-                {list.length === 0 && (
+                )}
+                {!loading && list.length === 0 && (
                   <div className="text-center py-12 text-muted-foreground">
                     <Wallet className="w-10 h-10 mx-auto mb-2 opacity-40" />
                     <p>No payouts</p>
