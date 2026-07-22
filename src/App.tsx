@@ -11,6 +11,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import Dashboard from "./pages/Dashboard";
 import DashboardListings from "./pages/DashboardListings";
 import DashboardTransactions from "./pages/DashboardTransactions";
@@ -35,8 +39,6 @@ import AdminFeedback from "./pages/AdminFeedback";
 import AdminArticles from "./pages/AdminArticles";
 import AdminSwaps from "./pages/AdminSwaps";
 import AdminPayouts from "./pages/AdminPayouts";
-import AdminSecurity from "./pages/AdminSecurity";
-import AdminTeam from "./pages/AdminTeam";
 import AdminAnnouncements from "./pages/AdminAnnouncements";
 import SubmitGadget from "./pages/SubmitGadget";
 import Swap from "./pages/Swap";
@@ -70,6 +72,10 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
 
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
@@ -100,8 +106,6 @@ const App = () => (
             <Route path="/admin/articles" element={<AdminArticles />} />
             <Route path="/admin/swaps" element={<AdminSwaps />} />
             <Route path="/admin/payouts" element={<AdminPayouts />} />
-            <Route path="/admin/security" element={<AdminSecurity />} />
-            <Route path="/admin/team" element={<AdminTeam />} />
             <Route path="/admin/announcements" element={<AdminAnnouncements />} />
           </Route>
           <Route path="/swap" element={<Swap />} />

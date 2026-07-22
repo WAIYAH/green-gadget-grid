@@ -71,7 +71,13 @@ const Register = () => {
           </Button>
         </form>
 
-        <div className="mt-6 text-center text-sm">
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          By registering, you agree to our{" "}
+          <Link to="/terms" className="text-primary hover:underline">Terms</Link> and{" "}
+          <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+        </p>
+
+        <div className="mt-4 text-center text-sm">
           <p className="text-muted-foreground">
             Already have an account? <Link to="/login" className="text-primary hover:underline font-medium">Login here</Link>
           </p>
