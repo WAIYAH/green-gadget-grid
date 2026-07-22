@@ -1,30 +1,61 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Menu, Search, Coins, ChevronDown, User, Settings, LogOut, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
 interface Props {
   breadcrumbs: { label: string; path?: string }[];
   onMenuToggle: () => void;
 }
 
-const NOTIFICATIONS = [
-  { id: 1, title: "Listing approved", desc: "Your iPhone 12 was approved (+850 pts)", time: "5m ago", read: false },
-  { id: 2, title: "Swap shipped", desc: "Sony WH-1000XM4 is on the way", time: "1h ago", read: false },
-  { id: 3, title: "New reward unlocked", desc: "You reached Silver tier!", time: "Yesterday", read: false },
-  { id: 4, title: "Pickup scheduled", desc: "Pickup confirmed for Friday 2 PM", time: "2d ago", read: true },
-];
+type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+
+const timeAgo = (iso: string) => {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+};
 
 const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
-  const unread = NOTIFICATIONS.filter((n) => !n.read).length;
+  const [points, setPoints] = useState(0);
+  const [fullName, setFullName] = useState("");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unread, setUnread] = useState(0);
+
+  const fetchHeaderData = useCallback(async () => {
+    if (!user) return;
+    const [{ data: profile }, { data: notifRows }, { count: unreadCount }] = await Promise.all([
+      supabase.from("profiles").select("points, full_name").eq("id", user.id).maybeSingle(),
+      supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(5),
+      supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("read", false),
+    ]);
+    setPoints(profile?.points ?? 0);
+    setFullName(profile?.full_name || "");
+    setNotifications(notifRows || []);
+    setUnread(unreadCount || 0);
+  }, [user]);
+
+  useEffect(() => {
+    fetchHeaderData();
+    window.addEventListener("points:refresh", fetchHeaderData);
+    return () => window.removeEventListener("points:refresh", fetchHeaderData);
+  }, [fetchHeaderData]);
 
   useEffect(() => {
     const h = (e: MouseEvent) => {
@@ -39,6 +70,8 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
     await signOut();
     navigate("/login");
   };
+
+  const initial = (fullName || user?.email || "U").charAt(0).toUpperCase();
 
   return (
     <header className="h-16 flex items-center justify-between px-4 lg:px-6 border-b border-border/30 glass-sm sticky top-0 z-30">
@@ -75,7 +108,7 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
         {/* Points pill */}
         <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full glass text-sm font-semibold">
           <Coins className="w-4 h-4 text-accent" />
-          <span className="text-accent">2,450</span>
+          <span className="text-accent">{points.toLocaleString()}</span>
           <span className="text-muted-foreground text-xs">pts</span>
         </div>
 
@@ -110,26 +143,30 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
                   </button>
                 </div>
                 <div className="max-h-72 overflow-y-auto">
-                  {NOTIFICATIONS.map((n) => (
-                    <div
-                      key={n.id}
-                      className={cn(
-                        "px-3 py-2.5 border-b border-border/10 hover:bg-muted/30 transition-colors cursor-pointer",
-                        !n.read && "bg-primary/5"
-                      )}
-                    >
-                      <div className="flex items-start gap-2">
-                        {!n.read && <div className="mt-1.5 w-2 h-2 rounded-full bg-primary shrink-0" />}
-                        <div className={cn(!n.read ? "" : "ml-4")}>
-                          <p className="text-sm font-medium text-foreground">{n.title}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{n.desc}</p>
-                          <p className="text-[11px] text-muted-foreground/60 mt-1 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> {n.time}
-                          </p>
+                  {notifications.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No notifications yet</p>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={cn(
+                          "px-3 py-2.5 border-b border-border/10 hover:bg-muted/30 transition-colors cursor-pointer",
+                          !n.read && "bg-primary/5"
+                        )}
+                      >
+                        <div className="flex items-start gap-2">
+                          {!n.read && <div className="mt-1.5 w-2 h-2 rounded-full bg-primary shrink-0" />}
+                          <div className={cn(!n.read ? "" : "ml-4")}>
+                            <p className="text-sm font-medium text-foreground">{n.title}</p>
+                            {n.body && <p className="text-xs text-muted-foreground mt-0.5">{n.body}</p>}
+                            <p className="text-[11px] text-muted-foreground/60 mt-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> {timeAgo(n.created_at)}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </motion.div>
             )}
@@ -144,7 +181,7 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
           >
             <div className="relative">
               <div className="w-8 h-8 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
-                U
+                {initial}
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-card bg-primary" />
             </div>
@@ -159,8 +196,8 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
                 className="absolute right-0 top-full mt-2 w-56 rounded-xl glass-lg border border-border/50 shadow-elevated overflow-hidden z-50"
               >
                 <div className="p-3 border-b border-border/30">
-                  <p className="text-sm font-semibold text-foreground">Triple G User</p>
-                  <p className="text-xs text-muted-foreground">user@tripleG.com</p>
+                  <p className="text-sm font-semibold text-foreground">{fullName || "Triple G User"}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
                 <div className="p-1.5">
                   <button
