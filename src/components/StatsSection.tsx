@@ -1,6 +1,7 @@
 import { motion, useInView } from "framer-motion";
 import { Recycle, Wind, Users, Award, Sparkles } from "lucide-react";
 import { useEffect, useState, useRef, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface StatConfig {
   icon: React.ElementType;
@@ -11,11 +12,11 @@ interface StatConfig {
   detail: string;
 }
 
-const STATS: StatConfig[] = [
-  { icon: Recycle, end: 125000, label: "Gadgets Recycled", suffix: "+", color: "text-primary", detail: "Phones: 45K · Laptops: 32K · Tablets: 28K · Other: 20K" },
-  { icon: Wind, end: 45000, label: "CO₂ Saved (tons)", suffix: "", color: "text-accent", detail: "Equivalent to planting 2M trees" },
-  { icon: Users, end: 25000, label: "Active Users", suffix: "+", color: "text-primary", detail: "Growing 15% month-over-month" },
-  { icon: Award, end: 2500000, label: "Rewards Distributed", suffix: " pts", color: "text-accent", detail: "Avg 100 pts per submission" },
+const buildStats = (s: { gadgets_recycled: number; co2_saved_kg: number; active_users: number; points_distributed: number }): StatConfig[] => [
+  { icon: Recycle, end: s.gadgets_recycled, label: "Gadgets Recycled", suffix: "+", color: "text-primary", detail: "Approved submissions, diverted from landfills" },
+  { icon: Wind, end: Math.round(s.co2_saved_kg), label: "CO₂ Saved (kg)", suffix: "", color: "text-accent", detail: "Tracked per device from actual submissions" },
+  { icon: Users, end: s.active_users, label: "Active Users", suffix: "+", color: "text-primary", detail: "Registered members of the Triple G community" },
+  { icon: Award, end: s.points_distributed, label: "Points Distributed", suffix: " pts", color: "text-accent", detail: "Earned through approved gadget submissions" },
 ];
 
 const formatNumber = (n: number): string => n.toLocaleString();
@@ -78,7 +79,7 @@ const StatCard = ({ stat, index }: { stat: StatConfig; index: number }) => {
   }, [isInView, paused, animate]);
 
   const Icon = stat.icon;
-  const progress = count / stat.end;
+  const progress = stat.end > 0 ? count / stat.end : 0;
 
   return (
     <motion.div
@@ -153,6 +154,21 @@ const StatCard = ({ stat, index }: { stat: StatConfig; index: number }) => {
 };
 
 const StatsSection = () => {
+  const [stats, setStats] = useState(buildStats({ gadgets_recycled: 0, co2_saved_kg: 0, active_users: 0, points_distributed: 0 }));
+
+  useEffect(() => {
+    supabase.rpc("get_public_stats").maybeSingle().then(({ data }) => {
+      if (data) {
+        setStats(buildStats({
+          gadgets_recycled: Number(data.gadgets_recycled),
+          co2_saved_kg: Number(data.co2_saved_kg),
+          active_users: Number(data.active_users),
+          points_distributed: Number(data.points_distributed),
+        }));
+      }
+    });
+  }, []);
+
   return (
     <section className="py-20 md:py-28 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-radial opacity-50" />
@@ -166,12 +182,12 @@ const StatsSection = () => {
         >
           <h2 className="mb-4">Our Impact in <span className="text-gradient-primary">Numbers</span></h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Real-time metrics powering a sustainable future. Click any card to pause.
+            Real metrics from the platform. Click any card to pause.
           </p>
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          {STATS.map((stat, i) => (
+          {stats.map((stat, i) => (
             <StatCard key={stat.label} stat={stat} index={i} />
           ))}
         </div>

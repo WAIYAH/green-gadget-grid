@@ -10,7 +10,6 @@ import HeroSection from "@/components/HeroSection";
 import StatsSection from "@/components/StatsSection";
 import HowItWorks from "@/components/HowItWorks";
 import ProductShowcase from "@/components/ProductShowcase";
-import Testimonials from "@/components/Testimonials";
 import {
   ScrollReveal,
   ParallaxLayer,
@@ -28,7 +27,6 @@ const SECTIONS = [
   { id: "stats", label: "Impact" },
   { id: "how-it-works", label: "How It Works" },
   { id: "showcase", label: "Showcase" },
-  { id: "testimonials", label: "Reviews" },
   { id: "features", label: "Features" },
   { id: "cta", label: "Get Started" },
 ];
@@ -122,15 +120,6 @@ const Index = () => {
       </div>
 
       <SectionTransition variant="slant" className="relative z-10" />
-
-      {/* Testimonials */}
-      <div id="testimonials" className="scroll-snap-section relative z-10">
-        <ParallaxLayer speed={0.15}>
-          <Testimonials />
-        </ParallaxLayer>
-      </div>
-
-      <SectionTransition variant="wave" className="relative z-10" />
 
       {/* Features Section */}
       <section id="features" className="scroll-snap-section py-20 md:py-28 relative overflow-hidden z-10">

@@ -5,6 +5,7 @@ import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const AnimatedCounter = ({ end, duration = 2000, suffix = "" }: { end: number; duration?: number; suffix?: string }) => {
   const [count, setCount] = useState(0);
@@ -33,11 +34,7 @@ const SOCIAL_LINKS = [
   { icon: Instagram, href: "#", label: "Instagram", hoverColor: "hover:text-[hsl(330,70%,60%)]" },
 ];
 
-const IMPACT_STATS = [
-  { icon: Recycle, label: "Gadgets Recycled Today", value: 847, suffix: "+" },
-  { icon: TreePine, label: "CO₂ Saved (kg)", value: 3200, suffix: "kg" },
-  { icon: Zap, label: "Active Users", value: 12400, suffix: "+" },
-];
+const IMPACT_ICONS = [Recycle, TreePine, Zap];
 
 const FOOTER_SECTIONS = [
   {
@@ -55,6 +52,8 @@ const FOOTER_SECTIONS = [
       { to: "/about", label: "About Us" },
       { to: "/dashboard", label: "Dashboard" },
       { to: "/map", label: "Find Pickup" },
+      { to: "/privacy", label: "Privacy Policy" },
+      { to: "/terms", label: "Terms of Service" },
     ],
   },
   {
@@ -94,21 +93,39 @@ const CollapsibleSection = ({ title, children }: { title: string; children: Reac
   );
 };
 
+const FALLBACK_STATS = { gadgets_recycled: 0, co2_saved_kg: 0, active_users: 0 };
+
 const Footer = () => {
   const footerRef = useRef<HTMLElement>(null);
   const inView = useInView(footerRef, { once: true, margin: "-50px" });
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [stats, setStats] = useState(FALLBACK_STATS);
 
-  const handleNewsletterSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    supabase.rpc("get_public_stats").maybeSingle().then(({ data }) => {
+      if (data) setStats({ gadgets_recycled: data.gadgets_recycled, co2_saved_kg: data.co2_saved_kg, active_users: data.active_users });
+    });
+  }, []);
+
+  const impactStats = [
+    { icon: IMPACT_ICONS[0], label: "Gadgets Recycled", value: Number(stats.gadgets_recycled), suffix: "+" },
+    { icon: IMPACT_ICONS[1], label: "CO₂ Saved", value: Math.round(Number(stats.co2_saved_kg)), suffix: "kg" },
+    { icon: IMPACT_ICONS[2], label: "Active Users", value: Number(stats.active_users), suffix: "+" },
+  ];
+
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
     setSubmitting(true);
-    setTimeout(() => {
-      toast.success("Subscribed! Welcome to the Triple G community 🌱");
-      setEmail("");
-      setSubmitting(false);
-    }, 800);
+    const { error } = await supabase.from("newsletter_subscribers").insert({ email });
+    setSubmitting(false);
+    if (error) {
+      toast.error(error.message.includes("duplicate") ? "You're already subscribed" : error.message);
+      return;
+    }
+    toast.success("Subscribed! Welcome to the Triple G community 🌱");
+    setEmail("");
   };
 
   const stagger = {
@@ -156,7 +173,7 @@ const Footer = () => {
       <div className="relative border-y border-border/30">
         <div className="container mx-auto px-4 py-5">
           <div className="flex flex-wrap justify-center gap-6 md:gap-12">
-            {IMPACT_STATS.map(({ icon: Icon, label, value, suffix }) => (
+            {impactStats.map(({ icon: Icon, label, value, suffix }) => (
               <div key={label} className="flex items-center gap-3 text-center">
                 <div className="w-10 h-10 rounded-xl glass flex items-center justify-center">
                   <Icon className="w-5 h-5 text-primary" />
