@@ -215,10 +215,19 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
                                 {item.badge}
                               </motion.span>
                             )}
-                            <button
+                            <span
+                              role="button"
+                              tabIndex={0}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                item.path && toggleBookmark(item.path);
+                                if (item.path) toggleBookmark(item.path);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  if (item.path) toggleBookmark(item.path);
+                                }
                               }}
                               className="opacity-0 group-hover:opacity-100 transition-opacity"
                             >
@@ -230,7 +239,7 @@ const AdminSidebar = ({ collapsed, onToggle, onSearchOpen }: AdminSidebarProps) 
                                     : "text-muted-foreground"
                                 )}
                               />
-                            </button>
+                            </span>
                           </>
                         )}
 

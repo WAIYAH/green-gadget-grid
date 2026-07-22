@@ -4,10 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Leaf } from "lucide-react";
+import { ArrowLeft, Leaf } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -20,28 +19,29 @@ const Login = () => {
     e.preventDefault();
     if (!email || !password) return toast.error("Please fill in all fields");
     setLoading(true);
-    const { error } = await signIn(email, password);
+    const { error, role } = await signIn(email, password);
     setLoading(false);
     if (error) return toast.error(error.message);
 
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userData.user.id);
-    const isAdmin = roles?.some((r) => r.role === "admin");
+    const isAdmin = role === "admin";
     toast.success(isAdmin ? "Welcome back, Admin!" : "Welcome back!");
     navigate(isAdmin ? "/admin" : "/dashboard");
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
+      <Link
+        to="/"
+        className="absolute top-6 left-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to home
+      </Link>
       <Card className="w-full max-w-md p-8 shadow-primary animate-scale-in">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mb-4">
+          <Link to="/" className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mb-4 hover:opacity-90 transition-opacity">
             <Leaf className="w-10 h-10 text-white" />
-          </div>
+          </Link>
           <h1 className="text-3xl font-bold text-gradient-primary">Triple G — Secure Login Portal</h1>
           <p className="text-muted-foreground mt-2">Welcome back!</p>
         </div>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Leaf } from "lucide-react";
+import { ArrowLeft, Leaf } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -33,11 +33,18 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-subtle p-4">
+      <Link
+        to="/"
+        className="absolute top-6 left-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" />
+        Back to home
+      </Link>
       <Card className="w-full max-w-md p-8 shadow-primary animate-scale-in">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mb-4">
+          <Link to="/" className="w-16 h-16 bg-gradient-primary rounded-2xl flex items-center justify-center mb-4 hover:opacity-90 transition-opacity">
             <Leaf className="w-10 h-10 text-white" />
-          </div>
+          </Link>
           <h1 className="text-3xl font-bold text-gradient-primary">Triple G — Join the E-Waste Movement</h1>
           <p className="text-muted-foreground mt-2">Create your account</p>
         </div>

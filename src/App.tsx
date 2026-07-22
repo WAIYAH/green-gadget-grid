@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { AwarenessProvider } from "./contexts/AwarenessContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -63,38 +65,45 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <ScrollToTop />
+        <ErrorBoundary>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/dashboard/listings" element={<DashboardListings />} />
-          <Route path="/dashboard/transactions" element={<DashboardTransactions />} />
-          <Route path="/dashboard/swaps" element={<DashboardSwaps />} />
-          <Route path="/dashboard/orders" element={<DashboardOrders />} />
-          <Route path="/dashboard/rewards" element={<DashboardRewards />} />
-          <Route path="/dashboard/impact" element={<DashboardImpact />} />
-          <Route path="/dashboard/profile" element={<DashboardProfile />} />
-          <Route path="/dashboard/notifications" element={<DashboardNotifications />} />
-          <Route path="/dashboard/settings" element={<DashboardSettings />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/admin/profile" element={<AdminProfile />} />
-          <Route path="/admin/settings" element={<AdminSettings />} />
-          <Route path="/admin/analytics" element={<AdminAnalytics />} />
-          <Route path="/admin/reports" element={<AdminReports />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/gadgets" element={<AdminGadgets />} />
-          <Route path="/admin/transactions" element={<AdminTransactions />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
-          <Route path="/admin/tickets" element={<AdminTickets />} />
-          <Route path="/admin/feedback" element={<AdminFeedback />} />
-          <Route path="/admin/articles" element={<AdminArticles />} />
-          <Route path="/admin/swaps" element={<AdminSwaps />} />
-          <Route path="/admin/payouts" element={<AdminPayouts />} />
-          <Route path="/admin/security" element={<AdminSecurity />} />
-          <Route path="/admin/team" element={<AdminTeam />} />
-          <Route path="/admin/announcements" element={<AdminAnnouncements />} />
-          <Route path="/submit-gadget" element={<SubmitGadget />} />
+
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/listings" element={<DashboardListings />} />
+            <Route path="/dashboard/transactions" element={<DashboardTransactions />} />
+            <Route path="/dashboard/swaps" element={<DashboardSwaps />} />
+            <Route path="/dashboard/orders" element={<DashboardOrders />} />
+            <Route path="/dashboard/rewards" element={<DashboardRewards />} />
+            <Route path="/dashboard/impact" element={<DashboardImpact />} />
+            <Route path="/dashboard/profile" element={<DashboardProfile />} />
+            <Route path="/dashboard/notifications" element={<DashboardNotifications />} />
+            <Route path="/dashboard/settings" element={<DashboardSettings />} />
+            <Route path="/submit-gadget" element={<SubmitGadget />} />
+          </Route>
+
+          <Route element={<ProtectedRoute requireAdmin />}>
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/profile" element={<AdminProfile />} />
+            <Route path="/admin/settings" element={<AdminSettings />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            <Route path="/admin/reports" element={<AdminReports />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/gadgets" element={<AdminGadgets />} />
+            <Route path="/admin/transactions" element={<AdminTransactions />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/tickets" element={<AdminTickets />} />
+            <Route path="/admin/feedback" element={<AdminFeedback />} />
+            <Route path="/admin/articles" element={<AdminArticles />} />
+            <Route path="/admin/swaps" element={<AdminSwaps />} />
+            <Route path="/admin/payouts" element={<AdminPayouts />} />
+            <Route path="/admin/security" element={<AdminSecurity />} />
+            <Route path="/admin/team" element={<AdminTeam />} />
+            <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+          </Route>
           <Route path="/swap" element={<Swap />} />
           <Route path="/awareness" element={<Awareness />} />
           <Route path="/map" element={<Map />} />
@@ -102,6 +111,7 @@ const App = () => (
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
+        </ErrorBoundary>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>

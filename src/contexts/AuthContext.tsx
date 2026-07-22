@@ -1,14 +1,14 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthError, Session, User } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: "admin" | "user" | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: AuthError | null; role: "admin" | "user" | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -20,15 +20,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<"admin" | "user" | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadRole = async (uid: string) => {
+  const fetchRole = useCallback(async (uid: string): Promise<"admin" | "user"> => {
     const { data } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", uid);
-    if (data?.some((r) => r.role === "admin")) setRole("admin");
-    else if (data?.length) setRole("user");
-    else setRole("user");
-  };
+    return data?.some((r) => r.role === "admin") ? "admin" : "user";
+  }, []);
+
+  const loadRole = useCallback(async (uid: string) => {
+    setRole(await fetchRole(uid));
+  }, [fetchRole]);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -41,19 +43,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
+      if (!s?.user) {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      // getSession() only decodes the locally-cached JWT — it doesn't confirm
+      // the user still exists server-side. A session cached before a local
+      // `supabase db reset` (or a deleted account) would otherwise look valid
+      // right up until a write hits a foreign key on a wiped user id. Verify
+      // against the server before trusting it.
+      const { error: userErr } = await supabase.auth.getUser();
+      if (userErr) {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setRole(null);
+        setLoading(false);
+        return;
+      }
       setSession(s);
-      setUser(s?.user ?? null);
-      if (s?.user) loadRole(s.user.id);
+      setUser(s.user);
+      await loadRole(s.user.id);
       setLoading(false);
     });
 
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [loadRole]);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) return { error, role: null };
+    const userRole = await fetchRole(data.user.id);
+    setRole(userRole);
+    return { error: null, role: userRole };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {

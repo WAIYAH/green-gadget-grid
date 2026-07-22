@@ -26,7 +26,7 @@ const Navbar = () => {
   const isAuthenticated = !!user;
   const userRole = role || "user";
 
-  useEffect(() => {
+  const fetchPoints = useCallback(() => {
     if (!user) { setPoints(0); return; }
     supabase.from("profiles").select("points").eq("id", user.id).maybeSingle().then(({ data }) => {
       const target = data?.points ?? 0;
@@ -39,6 +39,16 @@ const Navbar = () => {
       }, 30);
     });
   }, [user]);
+
+  useEffect(() => { fetchPoints(); }, [fetchPoints, location.pathname]);
+
+  // Any component that mutates the current user's points (swap redemption,
+  // reward redemption, etc.) dispatches this event for an instant refresh
+  // without waiting for a route change.
+  useEffect(() => {
+    window.addEventListener("points:refresh", fetchPoints);
+    return () => window.removeEventListener("points:refresh", fetchPoints);
+  }, [fetchPoints]);
 
   const handleScroll = useCallback(() => {
     const currentY = window.scrollY;
