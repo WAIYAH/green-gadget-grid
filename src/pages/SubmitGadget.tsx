@@ -60,6 +60,15 @@ const SubmitGadget = () => {
       return toast.error("Please fill in all required fields");
     }
     setSaving(true);
+    let image_url: string | null = null;
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop() || "jpg";
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("gadget-images").upload(path, imageFile, { upsert: false });
+      if (upErr) { setSaving(false); return toast.error(`Image upload failed: ${upErr.message}`); }
+      const { data: signed } = await supabase.storage.from("gadget-images").createSignedUrl(path, 60 * 60 * 24 * 365);
+      image_url = signed?.signedUrl ?? path;
+    }
     const { error } = await supabase.from("gadgets").insert({
       user_id: user.id,
       name: formData.name,
@@ -67,6 +76,7 @@ const SubmitGadget = () => {
       category: formData.category,
       condition: formData.condition,
       description: formData.description,
+      image_url,
       points_value: estimatedPoints,
       cash_value: estimatedPoints * 0.1,
       status: "pending",
