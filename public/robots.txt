@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://tripleg.lovable.app/sitemap.xml
+Sitemap: https://tripleg.app/sitemap.xml
