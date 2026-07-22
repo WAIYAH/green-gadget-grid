@@ -17,6 +17,8 @@ const SubmitGadget = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     brand: "",
@@ -25,6 +27,15 @@ const SubmitGadget = () => {
     description: "",
   });
   const [estimatedPoints, setEstimatedPoints] = useState(0);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) return toast.error("Image must be under 10MB");
+    if (!file.type.startsWith("image/")) return toast.error("Please select an image");
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
   const calculatePoints = (condition: string, category: string) => {
     const baseValues: Record<string, number> = {
@@ -49,6 +60,15 @@ const SubmitGadget = () => {
       return toast.error("Please fill in all required fields");
     }
     setSaving(true);
+    let image_url: string | null = null;
+    if (imageFile) {
+      const ext = imageFile.name.split(".").pop() || "jpg";
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("gadget-images").upload(path, imageFile, { upsert: false });
+      if (upErr) { setSaving(false); return toast.error(`Image upload failed: ${upErr.message}`); }
+      const { data: signed } = await supabase.storage.from("gadget-images").createSignedUrl(path, 60 * 60 * 24 * 365);
+      image_url = signed?.signedUrl ?? path;
+    }
     const { error } = await supabase.from("gadgets").insert({
       user_id: user.id,
       name: formData.name,
@@ -56,6 +76,7 @@ const SubmitGadget = () => {
       category: formData.category,
       condition: formData.condition,
       description: formData.description,
+      image_url,
       points_value: estimatedPoints,
       cash_value: estimatedPoints * 0.1,
       status: "pending",
@@ -117,12 +138,19 @@ const SubmitGadget = () => {
                   <Textarea id="description" value={formData.description} onChange={(e) => handleInputChange("description", e.target.value)} rows={4} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Upload Images</Label>
-                  <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
-                    <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                    <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
-                  </div>
+                  <Label htmlFor="gadget-image">Upload Image</Label>
+                  <label htmlFor="gadget-image" className="block border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer">
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="Preview" className="mx-auto max-h-48 rounded-md object-contain" />
+                    ) : (
+                      <>
+                        <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Click to upload</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG up to 10MB</p>
+                      </>
+                    )}
+                    <input id="gadget-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                  </label>
                 </div>
                 <Button type="submit" disabled={saving} className="w-full bg-gradient-primary hover:opacity-90" size="lg">
                   {saving ? "Submitting…" : "Submit for Evaluation"}
