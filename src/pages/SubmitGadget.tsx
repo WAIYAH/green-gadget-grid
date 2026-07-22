@@ -17,6 +17,8 @@ const SubmitGadget = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
   const [formData, setFormData] = useState({
     name: "",
     brand: "",
@@ -25,6 +27,15 @@ const SubmitGadget = () => {
     description: "",
   });
   const [estimatedPoints, setEstimatedPoints] = useState(0);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) return toast.error("Image must be under 10MB");
+    if (!file.type.startsWith("image/")) return toast.error("Please select an image");
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
 
   const calculatePoints = (condition: string, category: string) => {
     const baseValues: Record<string, number> = {
