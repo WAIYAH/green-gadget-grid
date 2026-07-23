@@ -51,7 +51,11 @@ const fromRow = (row: SwapItemRow, swapCounts: Map<string, number>): SwapItem =>
   date: row.created_at.split("T")[0],
 });
 
-const CATEGORIES = ["Laptops", "Phones", "Accessories", "Tablets", "Components"];
+// Must match the real category values used across the Swap Center catalog
+// (see src/pages/Swap.tsx's iconForCategory and supabase/seed.sql) — the
+// previous list ("Laptops", "Phones", ...) never matched any real row, so
+// filtering and editing category here silently did nothing useful.
+const CATEGORIES = ["laptop", "audio", "tablet", "wearable", "reader", "smart-home", "gaming", "accessory"];
 
 const statusConfig = {
   available: { label: "Available", color: "bg-primary/15 text-primary", icon: CheckCircle2 },
@@ -76,13 +80,15 @@ const AdminSwaps = () => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: rows, error }, { data: swaps }] = await Promise.all([
+    const [{ data: rows, error }, { data: orderRows }] = await Promise.all([
       supabase.from("swap_items").select("*").order("created_at", { ascending: false }),
-      supabase.from("swaps").select("item_id"),
+      // Redemptions are recorded as orders (via redeem_swap_item), not in the
+      // legacy/unused "swaps" table — count from there so this isn't always 0.
+      supabase.from("orders").select("item_id").neq("status", "cancelled"),
     ]);
     if (error) { toast.error(error.message); setLoading(false); return; }
     const swapCounts = new Map<string, number>();
-    (swaps || []).forEach((s) => {
+    (orderRows || []).forEach((s) => {
       if (s.item_id) swapCounts.set(s.item_id, (swapCounts.get(s.item_id) || 0) + 1);
     });
     setItems((rows || []).map((r) => fromRow(r, swapCounts)));
@@ -197,7 +203,7 @@ const AdminSwaps = () => {
             <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
-              {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c.replace("-", " ")}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -249,9 +255,13 @@ const AdminSwaps = () => {
                             >
                               <td className="p-3">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-lg bg-muted/40 flex items-center justify-center shrink-0">
-                                    <Package className="w-4 h-4 text-muted-foreground" />
-                                  </div>
+                                  {item.image && item.image !== "/placeholder.svg" ? (
+                                    <img src={item.image} alt={item.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded-lg bg-muted/40 flex items-center justify-center shrink-0">
+                                      <Package className="w-4 h-4 text-muted-foreground" />
+                                    </div>
+                                  )}
                                   <div>
                                     <p className="text-sm font-medium text-foreground">{item.name}</p>
                                     <p className="text-[11px] text-muted-foreground capitalize">{item.condition}</p>
@@ -316,7 +326,7 @@ const AdminSwaps = () => {
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {CATEGORIES.map((c) => <SelectItem key={c} value={c} className="capitalize">{c.replace("-", " ")}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -361,6 +371,15 @@ const AdminSwaps = () => {
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">Description</label>
               <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Image URL</label>
+              <Input
+                value={form.image}
+                onChange={(e) => setForm({ ...form, image: e.target.value })}
+                placeholder="/images/products/your-photo.jpg"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">A path under public/images/products/ or any external image URL.</p>
             </div>
           </div>
           <DialogFooter>

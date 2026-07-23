@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LayoutDashboard, Leaf, Award, Smartphone, CreditCard, ArrowLeftRight,
+  LayoutDashboard, Leaf, Award, Smartphone, CreditCard,
   Package, UserCircle, Bell, Settings, ChevronLeft, Plus, LogOut, BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,6 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "My Listings", icon: Smartphone, path: "/dashboard/listings" },
       { label: "Transactions", icon: CreditCard, path: "/dashboard/transactions" },
-      { label: "Swaps", icon: ArrowLeftRight, path: "/dashboard/swaps" },
       { label: "Orders", icon: Package, path: "/dashboard/orders" },
     ],
   },

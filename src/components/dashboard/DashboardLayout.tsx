@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutDashboard, Smartphone, ArrowLeftRight, UserCircle } from "lucide-react";
+import { LayoutDashboard, Smartphone, Package, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashboardSidebar from "./DashboardSidebar";
 import DashboardHeader from "./DashboardHeader";
@@ -15,7 +15,7 @@ interface Props {
 const MOBILE_NAV = [
   { label: "Home", icon: LayoutDashboard, path: "/dashboard" },
   { label: "Listings", icon: Smartphone, path: "/dashboard/listings" },
-  { label: "Swaps", icon: ArrowLeftRight, path: "/dashboard/swaps" },
+  { label: "Orders", icon: Package, path: "/dashboard/orders" },
   { label: "Profile", icon: UserCircle, path: "/dashboard/profile" },
 ];
 

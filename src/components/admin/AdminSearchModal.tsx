@@ -3,19 +3,27 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, LayoutDashboard, Users, Smartphone, FileText, ShoppingBag,
-  CreditCard, Settings, TicketCheck, X, ArrowRight
+  CreditCard, Settings, TicketCheck, ArrowRight, BarChart3, FileBarChart,
+  Package, Wallet, UserCircle, MessageSquare, Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SEARCH_ITEMS = [
   { label: "Dashboard", path: "/admin", icon: LayoutDashboard, category: "Pages" },
+  { label: "Analytics", path: "/admin/analytics", icon: BarChart3, category: "Pages" },
+  { label: "Reports", path: "/admin/reports", icon: FileBarChart, category: "Pages" },
   { label: "Users", path: "/admin/users", icon: Users, category: "Pages" },
   { label: "Gadgets", path: "/admin/gadgets", icon: Smartphone, category: "Pages" },
   { label: "Articles", path: "/admin/articles", icon: FileText, category: "Pages" },
   { label: "Swaps", path: "/admin/swaps", icon: ShoppingBag, category: "Pages" },
   { label: "Transactions", path: "/admin/transactions", icon: CreditCard, category: "Pages" },
+  { label: "Orders", path: "/admin/orders", icon: Package, category: "Pages" },
+  { label: "Payouts", path: "/admin/payouts", icon: Wallet, category: "Pages" },
   { label: "Settings", path: "/admin/settings", icon: Settings, category: "Pages" },
+  { label: "Profile", path: "/admin/profile", icon: UserCircle, category: "Pages" },
   { label: "Support Tickets", path: "/admin/tickets", icon: TicketCheck, category: "Pages" },
+  { label: "Feedback", path: "/admin/feedback", icon: MessageSquare, category: "Pages" },
+  { label: "Announcements", path: "/admin/announcements", icon: Megaphone, category: "Pages" },
   { label: "Create new user", path: "/admin/users", icon: Users, category: "Actions" },
   { label: "Export report", path: "/admin/reports", icon: FileText, category: "Actions" },
   { label: "Review gadgets", path: "/admin/gadgets", icon: Smartphone, category: "Actions" },
@@ -50,17 +58,6 @@ const AdminSearchModal = ({ open, onClose }: AdminSearchModalProps) => {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [open]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        if (!open) onClose(); // parent toggles
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
 
   const handleSelect = (path: string) => {
     navigate(path);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  FileText, Plus, Search, Edit, Trash2, Eye, TrendingUp, Clock,
-  CheckCircle2, FileEdit, Archive, Calendar, Tag, GraduationCap, X,
+  FileText, Plus, Search, Edit, Trash2, Eye, Clock,
+  Video, GraduationCap, Calendar, Tag, X,
 } from "lucide-react";
 import { useAwareness, ContentItem, QuizQuestion, AwarenessProvider } from "@/contexts/AwarenessContext";
 import { toast } from "sonner";
@@ -24,13 +24,6 @@ const emptyQuestion = (): QuizQuestion => ({ question: "", options: ["", "", "",
 const CATEGORIES = [
   "Sustainability 101", "Recycle Tips", "Tech & Environment",
   "Safe Disposal", "Reusing Components",
-];
-
-const stats = [
-  { label: "Published", value: "48", icon: CheckCircle2, color: "text-primary" },
-  { label: "Drafts", value: "12", icon: FileEdit, color: "text-accent" },
-  { label: "Total Views", value: "24.5K", icon: Eye, color: "text-primary" },
-  { label: "Engagement", value: "78%", icon: TrendingUp, color: "text-primary" },
 ];
 
 const AdminArticles = () => {
@@ -51,6 +44,13 @@ const AdminArticles = () => {
     const matchCat = filterCat === "all" || c.category === filterCat;
     return matchSearch && matchCat;
   });
+
+  const stats = useMemo(() => [
+    { label: "Total Content", value: String(content.length), icon: FileText, color: "text-primary" },
+    { label: "Videos", value: String(content.filter((c) => c.type === "video").length), icon: Video, color: "text-primary" },
+    { label: "Total Views", value: content.reduce((s, c) => s + c.views, 0).toLocaleString(), icon: Eye, color: "text-primary" },
+    { label: "With Quiz", value: String(content.filter((c) => c.quizQuestions && c.quizQuestions.length > 0).length), icon: GraduationCap, color: "text-accent" },
+  ], [content]);
 
   const openNew = () => {
     setEditing(null);

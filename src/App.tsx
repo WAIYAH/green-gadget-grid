@@ -18,7 +18,6 @@ import Terms from "./pages/Terms";
 import Dashboard from "./pages/Dashboard";
 import DashboardListings from "./pages/DashboardListings";
 import DashboardTransactions from "./pages/DashboardTransactions";
-import DashboardSwaps from "./pages/DashboardSwaps";
 import DashboardOrders from "./pages/DashboardOrders";
 import DashboardRewards from "./pages/DashboardRewards";
 import DashboardImpact from "./pages/DashboardImpact";
@@ -83,7 +82,6 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/listings" element={<DashboardListings />} />
             <Route path="/dashboard/transactions" element={<DashboardTransactions />} />
-            <Route path="/dashboard/swaps" element={<DashboardSwaps />} />
             <Route path="/dashboard/orders" element={<DashboardOrders />} />
             <Route path="/dashboard/rewards" element={<DashboardRewards />} />
             <Route path="/dashboard/impact" element={<DashboardImpact />} />

@@ -1,24 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Trash2, Check, Mail, Smartphone, MessageSquare, Loader2 } from "lucide-react";
+import { Bell, Trash2, Check, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 type Notification = Database["public"]["Tables"]["notifications"]["Row"];
-
-const PREFS_INIT = [
-  { category: "Listing updates", email: true, push: true, sms: false },
-  { category: "Swap notifications", email: true, push: true, sms: true },
-  { category: "Reward offers", email: true, push: false, sms: false },
-  { category: "Weekly impact digest", email: true, push: false, sms: false },
-  { category: "Product announcements", email: false, push: false, sms: false },
-];
 
 const catColor: Record<string, string> = {
   success: "bg-primary/15 text-primary border-primary/30",
@@ -40,10 +32,10 @@ const timeAgo = (iso: string) => {
 };
 
 const DashboardNotifications = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [prefs, setPrefs] = useState(PREFS_INIT);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -76,8 +68,14 @@ const DashboardNotifications = () => {
     setNotifs((p) => p.map((x) => x.id === n.id ? { ...x, read: !x.read } : x));
   };
 
-  const setPref = (i: number, key: "email" | "push" | "sms", v: boolean) =>
-    setPrefs((p) => p.map((row, idx) => idx === i ? { ...row, [key]: v } : row));
+  const openNotification = async (n: Notification) => {
+    if (!n.read) {
+      setNotifs((p) => p.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+      const { error } = await supabase.from("notifications").update({ read: true }).eq("id", n.id);
+      if (error) console.error("Failed to mark notification read:", error.message);
+    }
+    if (n.link) navigate(n.link);
+  };
 
   const unread = notifs.filter((n) => !n.read).length;
 
@@ -95,9 +93,9 @@ const DashboardNotifications = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="max-w-3xl">
         {/* Inbox */}
-        <Card className="lg:col-span-2 glass-lg border-border/30 overflow-hidden">
+        <Card className="glass-lg border-border/30 overflow-hidden">
           <div className="p-4 border-b border-border/20 flex items-center gap-2">
             <Bell className="w-4 h-4 text-primary" />
             <h2 className="font-semibold">Inbox</h2>
@@ -109,7 +107,11 @@ const DashboardNotifications = () => {
           ) : (
           <div className="divide-y divide-border/10 max-h-[600px] overflow-y-auto">
             {notifs.map((n) => (
-              <div key={n.id} className={`p-4 hover:bg-muted/30 transition-colors ${!n.read ? "bg-primary/5" : ""}`}>
+              <div
+                key={n.id}
+                onClick={() => openNotification(n)}
+                className={`p-4 hover:bg-muted/30 transition-colors ${n.link ? "cursor-pointer" : ""} ${!n.read ? "bg-primary/5" : ""}`}
+              >
                 <div className="flex items-start gap-3">
                   {!n.read && <div className="mt-2 w-2 h-2 rounded-full bg-primary shrink-0" />}
                   <div className={`flex-1 min-w-0 ${n.read ? "ml-5" : ""}`}>
@@ -121,10 +123,10 @@ const DashboardNotifications = () => {
                     <p className="text-[11px] text-muted-foreground/60 mt-1">{timeAgo(n.created_at)}</p>
                   </div>
                   <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => toggleRead(n)}>
+                    <Button size="icon" variant="ghost" className="w-8 h-8" onClick={(e) => { e.stopPropagation(); toggleRead(n); }}>
                       <Check className="w-4 h-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="w-8 h-8 text-destructive" onClick={() => remove(n.id)}>
+                    <Button size="icon" variant="ghost" className="w-8 h-8 text-destructive" onClick={(e) => { e.stopPropagation(); remove(n.id); }}>
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -134,33 +136,6 @@ const DashboardNotifications = () => {
             {notifs.length === 0 && <div className="p-8 text-center text-muted-foreground text-sm">No notifications.</div>}
           </div>
           )}
-        </Card>
-
-        {/* Preferences */}
-        <Card className="p-5 glass-lg border-border/30">
-          <h2 className="font-semibold mb-1">Preferences</h2>
-          <p className="text-xs text-muted-foreground mb-4">Choose where to receive each type of update.</p>
-          <div className="space-y-4">
-            {prefs.map((row, i) => (
-              <div key={row.category} className="pb-3 border-b border-border/10 last:border-0">
-                <p className="text-sm font-medium text-foreground mb-2">{row.category}</p>
-                <div className="space-y-2">
-                  {[
-                    { key: "email" as const, icon: Mail, label: "Email" },
-                    { key: "push" as const, icon: Smartphone, label: "Push" },
-                    { key: "sms" as const, icon: MessageSquare, label: "SMS" },
-                  ].map(({ key, icon: Icon, label }) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Icon className="w-3.5 h-3.5" /> {label}
-                      </span>
-                      <Switch checked={row[key]} onCheckedChange={(v) => setPref(i, key, v)} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
         </Card>
       </div>
     </DashboardLayout>

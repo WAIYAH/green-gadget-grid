@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
-import { Smartphone, Search, CheckCircle, XCircle, Clock, Loader2, Trash2 } from "lucide-react";
+import { Smartphone, Search, CheckCircle, XCircle, Clock, Loader2, Trash2, Download } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -16,6 +16,16 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 
 const fadeIn = (i: number) => ({ initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 }, transition: { delay: i * 0.05 } });
+
+const toCsv = (rows: Record<string, unknown>[]): string => {
+  if (rows.length === 0) return "";
+  const headers = Object.keys(rows[0]);
+  const escape = (v: unknown) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headers.join(","), ...rows.map((r) => headers.map((h) => escape(r[h])).join(","))].join("\n");
+};
 
 type Gadget = Database["public"]["Tables"]["gadgets"]["Row"];
 type Profile = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "full_name" | "email">;
@@ -109,6 +119,29 @@ const AdminGadgets = () => {
     load();
   };
 
+  const handleExport = () => {
+    if (filtered.length === 0) return toast.error("Nothing to export");
+    const rows = filtered.map((g) => ({
+      name: g.name,
+      brand: g.brand,
+      category: g.category,
+      condition: g.condition,
+      status: g.status,
+      submitter: profiles[g.user_id]?.full_name || profiles[g.user_id]?.email || "",
+      points_value: g.points_value,
+      cash_value: g.cash_value,
+      created_at: g.created_at,
+    }));
+    const blob = new Blob([toCsv(rows)], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "gadgets.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} gadgets`);
+  };
+
   return (
     <AdminLayout title="Gadgets" breadcrumbs={[{ label: "Content" }, { label: "Gadgets" }]}>
       <div className="flex items-center justify-between mb-6">
@@ -116,7 +149,7 @@ const AdminGadgets = () => {
           <h1 className="text-2xl font-bold text-foreground">Gadget Management</h1>
           <p className="text-sm text-muted-foreground">Review and manage gadget submissions</p>
         </div>
-        <Button size="sm"><Smartphone className="h-4 w-4 mr-1" />Export</Button>
+        <Button size="sm" onClick={handleExport}><Download className="h-4 w-4 mr-1" />Export</Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -173,8 +206,19 @@ const AdminGadgets = () => {
                 return (
                   <motion.tr key={g.id} {...fadeIn(i)} className="border-b border-border/50 hover:bg-muted/30">
                     <td className="p-3">
-                      <div className="text-foreground font-medium">{g.name}</div>
-                      <div className="text-xs text-muted-foreground">{g.brand}</div>
+                      <div className="flex items-center gap-3">
+                        {g.image_url ? (
+                          <img src={g.image_url} alt={g.name} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg bg-muted/40 flex items-center justify-center flex-shrink-0">
+                            <Smartphone className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-foreground font-medium">{g.name}</div>
+                          <div className="text-xs text-muted-foreground">{g.brand}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="p-3 text-muted-foreground capitalize">{g.condition}</td>
                     <td className="p-3"><Badge className={`text-xs gap-1 ${sc.color}`}><StatusIcon className="h-3 w-3" />{g.status}</Badge></td>

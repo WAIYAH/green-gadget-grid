@@ -37,6 +37,10 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
   const [fullName, setFullName] = useState("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ id: string; name: string }[]>([]);
+  const [showSearch, setShowSearch] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const fetchHeaderData = useCallback(async () => {
     if (!user) return;
@@ -61,14 +65,49 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
     const h = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotifs(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setShowProfile(false);
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowSearch(false);
     };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  // Quick search over the user's own gadget listings — the header search
+  // used to be decorative (it never queried anything); this makes it real.
+  useEffect(() => {
+    if (!user || searchQuery.trim().length < 2) { setSearchResults([]); return; }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      supabase
+        .from("gadgets")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .ilike("name", `%${searchQuery.trim()}%`)
+        .limit(5)
+        .then(({ data }) => { if (!cancelled) setSearchResults(data || []); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [searchQuery, user]);
+
+  const goToListings = (q: string) => {
+    setShowSearch(false);
+    navigate(`/dashboard/listings?q=${encodeURIComponent(q)}`);
+  };
+
   const handleLogout = async () => {
     await signOut();
     navigate("/login");
+  };
+
+  const handleNotificationClick = async (n: Notification) => {
+    setShowNotifs(false);
+    if (!n.read) {
+      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+      setUnread((prev) => Math.max(0, prev - 1));
+      supabase.from("notifications").update({ read: true }).eq("id", n.id).then(({ error }) => {
+        if (error) console.error("Failed to mark notification read:", error.message);
+      });
+    }
+    if (n.link) navigate(n.link);
   };
 
   const initial = (fullName || user?.email || "U").charAt(0).toUpperCase();
@@ -96,13 +135,43 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
       </div>
 
       <div className="flex items-center gap-2">
-        {/* Search (visual only) */}
-        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg glass-sm text-muted-foreground text-sm w-56">
-          <Search className="w-4 h-4" />
-          <input
-            placeholder="Search…"
-            className="bg-transparent outline-none flex-1 text-sm placeholder:text-muted-foreground/60"
-          />
+        {/* Quick search over My Listings */}
+        <div ref={searchRef} className="relative hidden md:block">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass-sm text-muted-foreground text-sm w-56">
+            <Search className="w-4 h-4 shrink-0" />
+            <input
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setShowSearch(true); }}
+              onFocus={() => setShowSearch(true)}
+              onKeyDown={(e) => { if (e.key === "Enter" && searchQuery.trim()) goToListings(searchQuery.trim()); }}
+              placeholder="Search my listings…"
+              className="bg-transparent outline-none flex-1 text-sm placeholder:text-muted-foreground/60 min-w-0"
+            />
+          </div>
+          <AnimatePresence>
+            {showSearch && searchQuery.trim().length >= 2 && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                className="absolute right-0 top-full mt-2 w-72 rounded-xl glass-lg border border-border/50 shadow-elevated overflow-hidden z-50"
+              >
+                {searchResults.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No listings match "{searchQuery.trim()}"</p>
+                ) : (
+                  searchResults.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => goToListings(r.name)}
+                      className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-muted/30 transition-colors border-b border-border/10 last:border-0"
+                    >
+                      {r.name}
+                    </button>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Points pill */}
@@ -147,10 +216,11 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
                     <p className="text-sm text-muted-foreground text-center py-6">No notifications yet</p>
                   ) : (
                     notifications.map((n) => (
-                      <div
+                      <button
                         key={n.id}
+                        onClick={() => handleNotificationClick(n)}
                         className={cn(
-                          "px-3 py-2.5 border-b border-border/10 hover:bg-muted/30 transition-colors cursor-pointer",
+                          "w-full text-left px-3 py-2.5 border-b border-border/10 hover:bg-muted/30 transition-colors cursor-pointer",
                           !n.read && "bg-primary/5"
                         )}
                       >
@@ -164,7 +234,7 @@ const DashboardHeader = ({ breadcrumbs, onMenuToggle }: Props) => {
                             </p>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>

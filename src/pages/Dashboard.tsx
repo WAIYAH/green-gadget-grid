@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Smartphone, Award, Leaf, TrendingUp, Plus, ArrowRight, ArrowLeftRight,
-  Package, Coins, CheckCircle2, XCircle, Clock, Loader2,
+  Package, Coins, CheckCircle2, XCircle, Clock, Loader2, BookOpen,
 } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
@@ -112,7 +112,9 @@ const Dashboard = () => {
   return (
     <DashboardLayout title="Home" breadcrumbs={[{ label: "Dashboard" }]}>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-1">Welcome back 👋</h1>
+        <h1 className="text-3xl font-bold mb-1">
+          Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""} 👋
+        </h1>
         <p className="text-muted-foreground text-sm">Here's what's happening with your gadgets and rewards.</p>
       </div>
 
@@ -241,6 +243,9 @@ const Dashboard = () => {
             </Button>
             <Button onClick={() => navigate("/dashboard/rewards")} variant="outline" className="w-full justify-start border-border/50">
               <Award className="w-4 h-4 mr-2" /> Redeem Rewards
+            </Button>
+            <Button onClick={() => navigate("/dashboard/learning")} variant="outline" className="w-full justify-start border-border/50">
+              <BookOpen className="w-4 h-4 mr-2" /> Learning Center
             </Button>
             <Button onClick={() => navigate("/dashboard/impact")} variant="outline" className="w-full justify-start border-border/50">
               <Leaf className="w-4 h-4 mr-2" /> View Impact

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Trash2, Eye, Smartphone } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus, Search, Trash2, Eye, Smartphone, Weight, Coins, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,9 +17,14 @@ interface Listing {
   id: string;
   name: string;
   brand: string | null;
+  model: string | null;
   category: string;
   condition: string;
+  description: string | null;
+  image_url: string | null;
+  weight_kg: number | null;
   points_value: number;
+  cash_value: number;
   status: string;
   created_at: string;
 }
@@ -33,10 +39,12 @@ const statusColor: Record<string, string> = {
 const DashboardListings = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState<Listing[]>([]);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(() => searchParams.get("q") || "");
   const [filter, setFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [viewing, setViewing] = useState<Listing | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -123,9 +131,13 @@ const DashboardListings = () => {
                 <TableRow key={l.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                        <Smartphone className="w-4 h-4" />
-                      </div>
+                      {l.image_url ? (
+                        <img src={l.image_url} alt={l.name} className="w-9 h-9 rounded-lg object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                          <Smartphone className="w-4 h-4" />
+                        </div>
+                      )}
                       <div>
                         <p className="font-medium text-foreground">{l.name}</p>
                         <p className="text-xs text-muted-foreground">{l.brand}</p>
@@ -141,7 +153,7 @@ const DashboardListings = () => {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => toast.info(`Viewing ${l.name}`)}>
+                      <Button size="icon" variant="ghost" className="w-8 h-8" onClick={() => setViewing(l)}>
                         <Eye className="w-4 h-4" />
                       </Button>
                       <Button size="icon" variant="ghost" className="w-8 h-8 text-destructive" onClick={() => handleDelete(l.id)}>
@@ -158,6 +170,59 @@ const DashboardListings = () => {
           </Table>
         </div>
       </Card>
+
+      <Dialog open={!!viewing} onOpenChange={(v) => !v && setViewing(null)}>
+        <DialogContent className="sm:max-w-md glass-lg border-border/30 p-0 overflow-hidden">
+          {viewing && (
+            <div>
+              <div className="relative h-48 bg-muted/30 flex items-center justify-center overflow-hidden">
+                {viewing.image_url ? (
+                  <img src={viewing.image_url} alt={viewing.name} className="w-full h-full object-cover" />
+                ) : (
+                  <Smartphone className="w-16 h-16 text-primary/40" />
+                )}
+                <Badge variant="outline" className={`absolute top-3 left-3 capitalize ${statusColor[viewing.status] || ""}`}>
+                  {viewing.status}
+                </Badge>
+              </div>
+              <div className="p-6">
+                <DialogHeader className="p-0 mb-3">
+                  <DialogTitle>{viewing.name}</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {[viewing.brand, viewing.model].filter(Boolean).join(" · ") || "No brand/model given"}
+                </p>
+                {viewing.description && (
+                  <p className="text-sm text-foreground/90 mb-4 leading-relaxed">{viewing.description}</p>
+                )}
+                <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+                  <div className="flex items-center justify-between py-2 border-b border-border/20">
+                    <span className="text-muted-foreground">Category</span>
+                    <span className="font-medium text-foreground capitalize">{viewing.category}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-border/20">
+                    <span className="text-muted-foreground">Condition</span>
+                    <span className="font-medium text-foreground capitalize">{viewing.condition}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-border/20">
+                    <span className="text-muted-foreground flex items-center gap-1"><Weight className="w-3.5 h-3.5" /> Weight</span>
+                    <span className="font-medium text-foreground">{viewing.weight_kg ? `${viewing.weight_kg} kg` : "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-border/20">
+                    <span className="text-muted-foreground flex items-center gap-1"><Coins className="w-3.5 h-3.5" /> Points</span>
+                    <span className="font-medium text-primary">{viewing.points_value.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-border/20 col-span-2">
+                    <span className="text-muted-foreground flex items-center gap-1"><DollarSign className="w-3.5 h-3.5" /> Cash value</span>
+                    <span className="font-medium text-foreground">${Number(viewing.cash_value).toFixed(2)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">Submitted {new Date(viewing.created_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };
