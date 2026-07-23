@@ -4,41 +4,33 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MapPin, Phone, Clock, Navigation } from "lucide-react";
+import { MapPin, Phone, Clock, Navigation, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-const pickupLocations = [
-  {
-    id: 1,
-    name: "Green Tech Recycling Center",
-    address: "123 Eco Street, Green City, GC 12345",
-    phone: "+1 (555) 123-4567",
-    hours: "Mon-Sat: 9:00 AM - 6:00 PM",
-  },
-  {
-    id: 2,
-    name: "E-Waste Solutions Hub",
-    address: "456 Sustainable Ave, Eco Town, ET 67890",
-    phone: "+1 (555) 987-6543",
-    hours: "Mon-Fri: 8:00 AM - 5:00 PM",
-  },
-  {
-    id: 3,
-    name: "Tech Recycle Point",
-    address: "789 Circular Road, Recycle City, RC 11223",
-    phone: "+1 (555) 456-7890",
-    hours: "Mon-Sun: 10:00 AM - 8:00 PM",
-  },
-];
+type PickupLocation = Database["public"]["Tables"]["pickup_centres"]["Row"];
 
 const Map = () => {
+  const [pickupLocations, setPickupLocations] = useState<PickupLocation[]>([]);
+  const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
     address: "",
     location: "",
   });
+
+  const loadLocations = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from("pickup_centres").select("*").eq("active", true).order("name");
+    if (error) { toast.error(error.message); setLoading(false); return; }
+    setPickupLocations(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { loadLocations(); }, [loadLocations]);
 
   const handleSchedulePickup = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +85,12 @@ const Map = () => {
 
               <div className="space-y-4">
                 <h3 className="text-2xl font-bold">Nearby Locations</h3>
-                {pickupLocations.map((location) => (
+                {loading ? (
+                  <div className="p-8 text-center text-muted-foreground flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading locations…
+                  </div>
+                ) : (
+                pickupLocations.map((location) => (
                   <Card key={location.id} className="p-4 shadow-card hover:shadow-primary transition-shadow">
                     <h4 className="font-bold text-lg mb-2">{location.name}</h4>
                     <div className="space-y-2 text-sm text-muted-foreground">
@@ -115,7 +112,8 @@ const Map = () => {
                       Get Directions
                     </Button>
                   </Card>
-                ))}
+                ))
+                )}
               </div>
             </div>
 

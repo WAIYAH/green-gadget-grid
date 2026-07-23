@@ -321,6 +321,8 @@ export type Database = {
           id: string
           item_id: string | null
           payment_method: string
+          pickup_centre_id: string | null
+          pickup_code: string | null
           quantity: number
           shipping_address: string | null
           status: Database["public"]["Enums"]["order_status"]
@@ -335,6 +337,8 @@ export type Database = {
           id?: string
           item_id?: string | null
           payment_method?: string
+          pickup_centre_id?: string | null
+          pickup_code?: string | null
           quantity?: number
           shipping_address?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -349,6 +353,8 @@ export type Database = {
           id?: string
           item_id?: string | null
           payment_method?: string
+          pickup_centre_id?: string | null
+          pickup_code?: string | null
           quantity?: number
           shipping_address?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -364,6 +370,13 @@ export type Database = {
             columns: ["item_id"]
             isOneToOne: false
             referencedRelation: "swap_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_pickup_centre_id_fkey"
+            columns: ["pickup_centre_id"]
+            isOneToOne: false
+            referencedRelation: "pickup_centres"
             referencedColumns: ["id"]
           },
         ]
@@ -401,6 +414,36 @@ export type Database = {
           status?: Database["public"]["Enums"]["payout_status"]
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      pickup_centres: {
+        Row: {
+          active: boolean
+          address: string
+          created_at: string
+          hours: string
+          id: string
+          name: string
+          phone: string
+        }
+        Insert: {
+          active?: boolean
+          address: string
+          created_at?: string
+          hours: string
+          id?: string
+          name: string
+          phone: string
+        }
+        Update: {
+          active?: boolean
+          address?: string
+          created_at?: string
+          hours?: string
+          id?: string
+          name?: string
+          phone?: string
         }
         Relationships: []
       }
@@ -758,7 +801,12 @@ export type Database = {
       }
       redeem_reward: { Args: { _reward_id: string }; Returns: string }
       redeem_swap_item: {
-        Args: { _item_id: string; _payment_method: string; _quantity: number }
+        Args: {
+          _item_id: string
+          _payment_method: string
+          _pickup_centre_id: string
+          _quantity: number
+        }
         Returns: string
       }
       reject_gadget: { Args: { _gadget_id: string }; Returns: undefined }
@@ -775,7 +823,13 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       gadget_status: "pending" | "approved" | "sold" | "rejected"
-      order_status: "processing" | "shipped" | "delivered" | "cancelled"
+      order_status:
+        | "processing"
+        | "shipped"
+        | "delivered"
+        | "cancelled"
+        | "ready_for_pickup"
+        | "picked_up"
       payout_status: "pending" | "processing" | "completed" | "failed"
       swap_status:
         | "pending"
@@ -916,7 +970,14 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       gadget_status: ["pending", "approved", "sold", "rejected"],
-      order_status: ["processing", "shipped", "delivered", "cancelled"],
+      order_status: [
+        "processing",
+        "shipped",
+        "delivered",
+        "cancelled",
+        "ready_for_pickup",
+        "picked_up",
+      ],
       payout_status: ["pending", "processing", "completed", "failed"],
       swap_status: [
         "pending",

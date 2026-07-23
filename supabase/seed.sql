@@ -10,6 +10,7 @@ declare
   _user_id uuid := gen_random_uuid();
   _instance_id uuid := '00000000-0000-0000-0000-000000000000';
   _swap_item_ids uuid[];
+  _pickup_centre_ids uuid[];
   _gadget_id uuid;
 begin
   -- ===================================================
@@ -118,6 +119,7 @@ begin
   ('JBL Flip 6 Speaker', 'audio', 'Gently used portable speaker.', '/placeholder.svg', 900, 55.00, 14, 'good', 'available');
 
   select array_agg(id) into _swap_item_ids from public.swap_items;
+  select array_agg(id order by created_at) into _pickup_centre_ids from public.pickup_centres;
 
   -- ===================================================
   -- GADGETS (submitted by demo user) — 5+
@@ -143,10 +145,10 @@ begin
   -- ===================================================
   -- ORDERS for demo user
   -- ===================================================
-  insert into public.orders (user_id, item_id, quantity, total_amount, total_points, payment_method, status, tracking, shipping_address) values
-  (_user_id, _swap_item_ids[1], 1, 0, 1800, 'points', 'delivered', 'DHL-DEMO-001', '123 Green St, Nairobi'),
-  (_user_id, _swap_item_ids[3], 1, 0, 950, 'points', 'shipped', 'FDX-DEMO-002', '123 Green St, Nairobi'),
-  (_user_id, _swap_item_ids[4], 2, 0, 840, 'points', 'processing', null, '123 Green St, Nairobi');
+  insert into public.orders (user_id, item_id, quantity, total_amount, total_points, payment_method, status, tracking, shipping_address, pickup_centre_id, pickup_code) values
+  (_user_id, _swap_item_ids[1], 1, 0, 1800, 'points', 'picked_up', 'DHL-DEMO-001', '123 Green St, Nairobi', _pickup_centre_ids[1], 'DEMO0001'),
+  (_user_id, _swap_item_ids[3], 1, 0, 950, 'points', 'ready_for_pickup', 'FDX-DEMO-002', '123 Green St, Nairobi', _pickup_centre_ids[2], 'DEMO0002'),
+  (_user_id, _swap_item_ids[4], 2, 0, 840, 'points', 'processing', null, '123 Green St, Nairobi', _pickup_centre_ids[3], 'DEMO0003');
 
   -- ===================================================
   -- NOTIFICATIONS for demo user
@@ -155,6 +157,6 @@ begin
   (_user_id, 'Gadget Approved!', 'Your iPhone 12 was approved. 750 points credited.', 'success', '/dashboard/listings', true),
   (_user_id, 'Gadget Approved!', 'Your Dell Inspiron 15 was approved. 1000 points credited.', 'success', '/dashboard/listings', true),
   (_user_id, 'Gadget Rejected', 'Your Beats Solo3 submission was rejected: condition too low.', 'warning', '/dashboard/listings', false),
-  (_user_id, 'Order Shipped', 'Your Logitech MX Master 3 Mouse order has shipped.', 'info', '/dashboard/orders', false),
+  (_user_id, 'Ready for pickup!', 'Your Logitech MX Master 3 Mouse is ready to collect at E-Waste Solutions Hub. Bring code DEMO0002 with you.', 'success', '/dashboard/orders', false),
   (_user_id, 'Welcome to Triple G!', 'Thanks for joining. Start submitting gadgets to earn points.', 'info', '/dashboard', true);
 end $$;

@@ -20,6 +20,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import {
   Laptop,
   Smartphone,
@@ -45,11 +47,14 @@ import {
   RotateCw,
   GitCompare,
   Sparkles,
+  MapPin,
+  Receipt as ReceiptIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import OrderReceipt from "@/components/OrderReceipt";
 
 // --- Types ---
 type SwapItemRow = Database["public"]["Tables"]["swap_items"]["Row"];
@@ -75,6 +80,15 @@ interface RecentOrder {
   cashUsed: number;
   date: string;
   status: string;
+  centreName: string | null;
+}
+
+interface PickupCentre {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  hours: string;
 }
 
 const iconForCategory = (category: string): typeof Laptop => {
@@ -534,8 +548,11 @@ const Swap = () => {
   const [quickViewItem, setQuickViewItem] = useState<SwapItem | null>(null);
   const [selectedItem, setSelectedItem] = useState<SwapItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"points" | "cash">("points");
+  const [pickupCentres, setPickupCentres] = useState<PickupCentre[]>([]);
+  const [selectedCentreId, setSelectedCentreId] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
   const [showCompare, setShowCompare] = useState(false);
   const [columns, setColumns] = useState(3);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -549,20 +566,32 @@ const Swap = () => {
     setLoading(false);
   }, []);
 
+  const loadPickupCentres = useCallback(async () => {
+    const { data, error } = await supabase.from("pickup_centres").select("id, name, address, phone, hours").eq("active", true).order("name");
+    if (error) { toast.error(error.message); return; }
+    setPickupCentres(data || []);
+  }, []);
+
   const loadUserData = useCallback(async () => {
     if (!user) { setUserPoints(0); setPointsSpent(0); setRecentOrders([]); return; }
     const [{ data: profile }, { data: orders }] = await Promise.all([
       supabase.from("profiles").select("points").eq("id", user.id).maybeSingle(),
-      supabase.from("orders").select("id, item_id, total_points, total_amount, payment_method, status, created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
+      supabase.from("orders").select("id, item_id, total_points, total_amount, payment_method, status, created_at, pickup_centre_id").eq("user_id", user.id).order("created_at", { ascending: false }).limit(10),
     ]);
     setUserPoints(profile?.points ?? 0);
 
     const rows = orders || [];
     const itemIds = Array.from(new Set(rows.map((o) => o.item_id).filter((id): id is string => !!id)));
+    const centreIds = Array.from(new Set(rows.map((o) => o.pickup_centre_id).filter((id): id is string => !!id)));
     let names: Record<string, string> = {};
+    let centreNames: Record<string, string> = {};
     if (itemIds.length) {
       const { data: itemRows } = await supabase.from("swap_items").select("id, name").in("id", itemIds);
       names = Object.fromEntries((itemRows || []).map((i) => [i.id, i.name]));
+    }
+    if (centreIds.length) {
+      const { data: centreRows } = await supabase.from("pickup_centres").select("id, name").in("id", centreIds);
+      centreNames = Object.fromEntries((centreRows || []).map((c) => [c.id, c.name]));
     }
     setRecentOrders(rows.map((o) => ({
       id: o.id,
@@ -571,11 +600,13 @@ const Swap = () => {
       cashUsed: Number(o.total_amount),
       date: o.created_at,
       status: o.status,
+      centreName: o.pickup_centre_id ? centreNames[o.pickup_centre_id] || null : null,
     })));
     setPointsSpent(rows.reduce((s, o) => s + o.total_points, 0));
   }, [user]);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
+  useEffect(() => { loadPickupCentres(); }, [loadPickupCentres]);
   useEffect(() => { loadUserData(); }, [loadUserData]);
 
   const categories = ["All", ...Array.from(new Set(items.map((i) => i.category)))];
@@ -608,6 +639,7 @@ const Swap = () => {
     }
     setSelectedItem(item);
     setPaymentMethod("points");
+    setSelectedCentreId(pickupCentres[0]?.id || "");
     setIsDialogOpen(true);
   };
 
@@ -618,16 +650,22 @@ const Swap = () => {
       setIsDialogOpen(false);
       return;
     }
+    if (!selectedCentreId) {
+      toast.error("Please choose a pickup centre");
+      return;
+    }
     setConfirming(true);
-    const { error } = await supabase.rpc("redeem_swap_item", {
+    const { data: orderId, error } = await supabase.rpc("redeem_swap_item", {
       _item_id: selectedItem.id,
       _quantity: 1,
       _payment_method: paymentMethod,
+      _pickup_centre_id: selectedCentreId,
     });
     setConfirming(false);
     setIsDialogOpen(false);
     if (error) return toast.error(error.message);
-    toast.success(`🎉 Successfully claimed ${selectedItem.name}!`);
+    toast.success(`🎉 Successfully claimed ${selectedItem.name}! Your receipt is ready.`);
+    if (orderId) setReceiptOrderId(orderId);
     loadCatalog();
     loadUserData();
     window.dispatchEvent(new Event("points:refresh"));
@@ -991,8 +1029,10 @@ const Swap = () => {
                           <tr className="border-b border-border/20">
                             <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Item</th>
                             <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Cost</th>
+                            <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pickup</th>
                             <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
                             <th className="text-left py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                            <th className="text-right py-3 px-5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Receipt</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1008,17 +1048,23 @@ const Swap = () => {
                               <td className="py-3 px-5 text-sm text-primary font-semibold">
                                 {t.pointsUsed > 0 ? `${t.pointsUsed.toLocaleString()} pts` : `$${t.cashUsed.toFixed(2)}`}
                               </td>
+                              <td className="py-3 px-5 text-sm text-muted-foreground">{t.centreName || "—"}</td>
                               <td className="py-3 px-5 text-sm text-muted-foreground">{new Date(t.date).toLocaleDateString()}</td>
                               <td className="py-3 px-5">
-                                <Badge className={`text-xs capitalize ${t.status === "delivered" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
-                                  {t.status === "delivered" && <Check className="w-3 h-3 mr-1" />}
-                                  {t.status}
+                                <Badge className={`text-xs capitalize ${t.status === "delivered" || t.status === "picked_up" ? "bg-primary/10 text-primary" : "bg-accent/10 text-accent"}`}>
+                                  {(t.status === "delivered" || t.status === "picked_up") && <Check className="w-3 h-3 mr-1" />}
+                                  {t.status.replace(/_/g, " ")}
                                 </Badge>
+                              </td>
+                              <td className="py-3 px-5 text-right">
+                                <Button variant="ghost" size="sm" onClick={() => setReceiptOrderId(t.id)} className="h-7 text-xs text-muted-foreground hover:text-primary">
+                                  <ReceiptIcon className="w-3.5 h-3.5 mr-1" /> View
+                                </Button>
                               </td>
                             </motion.tr>
                           ))}
                           {recentOrders.length === 0 && (
-                            <tr><td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">No orders yet.</td></tr>
+                            <tr><td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">No orders yet.</td></tr>
                           )}
                         </tbody>
                       </table>
@@ -1050,7 +1096,7 @@ const Swap = () => {
 
       {/* Swap Confirmation Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-md glass-lg border-border/30">
+        <DialogContent className="sm:max-w-md glass-lg border-border/30 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Confirm Swap</DialogTitle>
           </DialogHeader>
@@ -1102,6 +1148,33 @@ const Swap = () => {
                   </div>
                 </div>
               )}
+
+              <div>
+                <p className="text-sm font-semibold text-foreground mb-2 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-primary" /> Pickup centre
+                </p>
+                <RadioGroup value={selectedCentreId} onValueChange={setSelectedCentreId} className="space-y-2">
+                  {pickupCentres.map((centre) => (
+                    <label
+                      key={centre.id}
+                      htmlFor={`centre-${centre.id}`}
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+                        selectedCentreId === centre.id ? "border-primary/50 bg-primary/5" : "border-border/30 glass"
+                      }`}
+                    >
+                      <RadioGroupItem value={centre.id} id={`centre-${centre.id}`} className="mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{centre.name}</p>
+                        <p className="text-xs text-muted-foreground">{centre.address}</p>
+                        <p className="text-xs text-muted-foreground">{centre.hours}</p>
+                      </div>
+                    </label>
+                  ))}
+                  {pickupCentres.length === 0 && (
+                    <p className="text-xs text-muted-foreground">Loading pickup centres…</p>
+                  )}
+                </RadioGroup>
+              </div>
             </div>
           )}
 
@@ -1109,12 +1182,14 @@ const Swap = () => {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={confirming} className="border-border/30">
               Cancel
             </Button>
-            <Button onClick={handleConfirmSwap} disabled={confirming} className="bg-gradient-primary text-primary-foreground">
+            <Button onClick={handleConfirmSwap} disabled={confirming || !selectedCentreId} className="bg-gradient-primary text-primary-foreground">
               <Check className="w-4 h-4 mr-1" /> {confirming ? "Processing…" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <OrderReceipt orderId={receiptOrderId} open={!!receiptOrderId} onClose={() => setReceiptOrderId(null)} />
 
       <Footer />
     </div>

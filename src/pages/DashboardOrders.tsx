@@ -5,17 +5,21 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Package, ShoppingBag, Loader2 } from "lucide-react";
+import { Package, ShoppingBag, Loader2, MapPin, Receipt as ReceiptIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import OrderReceipt from "@/components/OrderReceipt";
 
 type Order = Database["public"]["Tables"]["orders"]["Row"];
 type SwapItem = Pick<Database["public"]["Tables"]["swap_items"]["Row"], "id" | "name">;
+type PickupCentre = Pick<Database["public"]["Tables"]["pickup_centres"]["Row"], "id" | "name">;
 
 const statusColor: Record<Order["status"], string> = {
   processing: "bg-accent/15 text-accent border-accent/30",
+  ready_for_pickup: "bg-primary/15 text-primary border-primary/30",
+  picked_up: "bg-primary/15 text-primary border-primary/30",
   shipped: "bg-blue-500/15 text-blue-400 border-blue-500/30",
   delivered: "bg-primary/15 text-primary border-primary/30",
   cancelled: "bg-destructive/15 text-destructive border-destructive/30",
@@ -26,8 +30,10 @@ const DashboardOrders = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [items, setItems] = useState<Record<string, SwapItem>>({});
+  const [centres, setCentres] = useState<Record<string, PickupCentre>>({});
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
+  const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -37,9 +43,14 @@ const DashboardOrders = () => {
     const rows = data || [];
     setOrders(rows);
     const itemIds = Array.from(new Set(rows.map((o) => o.item_id).filter((id): id is string => !!id)));
+    const centreIds = Array.from(new Set(rows.map((o) => o.pickup_centre_id).filter((id): id is string => !!id)));
     if (itemIds.length) {
       const { data: itemRows } = await supabase.from("swap_items").select("id, name").in("id", itemIds);
       setItems(Object.fromEntries((itemRows || []).map((i) => [i.id, i])));
+    }
+    if (centreIds.length) {
+      const { data: centreRows } = await supabase.from("pickup_centres").select("id, name").in("id", centreIds);
+      setCentres(Object.fromEntries((centreRows || []).map((c) => [c.id, c])));
     }
     setLoading(false);
   }, [user]);
@@ -64,8 +75,8 @@ const DashboardOrders = () => {
         <TabsList>
           <TabsTrigger value="All">All</TabsTrigger>
           <TabsTrigger value="Processing">Processing</TabsTrigger>
-          <TabsTrigger value="Shipped">Shipped</TabsTrigger>
-          <TabsTrigger value="Delivered">Delivered</TabsTrigger>
+          <TabsTrigger value="ready_for_pickup">Ready for Pickup</TabsTrigger>
+          <TabsTrigger value="picked_up">Picked Up</TabsTrigger>
           <TabsTrigger value="Cancelled">Cancelled</TabsTrigger>
         </TabsList>
       </Tabs>
@@ -88,16 +99,24 @@ const DashboardOrders = () => {
                   <p className="text-xs text-muted-foreground font-mono mt-0.5">
                     Qty {o.quantity} • {new Date(o.created_at).toLocaleDateString()}
                   </p>
+                  {o.pickup_centre_id && centres[o.pickup_centre_id] && (
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> Pickup: {centres[o.pickup_centre_id].name}
+                    </p>
+                  )}
                   {o.tracking && (
                     <p className="text-xs text-muted-foreground mt-1">Tracking: <span className="font-mono text-foreground">{o.tracking}</span></p>
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <p className="text-lg font-bold text-foreground">
                   {o.payment_method === "points" ? `${o.total_points.toLocaleString()} pts` : `$${Number(o.total_amount).toFixed(2)}`}
                 </p>
-                <Badge variant="outline" className={`capitalize ${statusColor[o.status]}`}>{o.status}</Badge>
+                <Badge variant="outline" className={`capitalize ${statusColor[o.status]}`}>{o.status.replace(/_/g, " ")}</Badge>
+                <Button variant="ghost" size="sm" onClick={() => setReceiptOrderId(o.id)} className="h-8 text-xs text-muted-foreground hover:text-primary">
+                  <ReceiptIcon className="w-3.5 h-3.5 mr-1" /> Receipt
+                </Button>
               </div>
             </div>
           </Card>
@@ -107,6 +126,8 @@ const DashboardOrders = () => {
         )}
       </div>
       )}
+
+      <OrderReceipt orderId={receiptOrderId} open={!!receiptOrderId} onClose={() => setReceiptOrderId(null)} />
     </DashboardLayout>
   );
 };
