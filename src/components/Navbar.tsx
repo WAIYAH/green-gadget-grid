@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Leaf, Menu, X, Coins, User, Home, ArrowLeftRight, BookOpen, Info, LayoutDashboard, Shield } from "lucide-react";
+import { Leaf, Menu, X, Coins, User, Home, ArrowLeftRight, BookOpen, Info, LayoutDashboard, Shield, MapPin } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { to: "/", label: "Home", icon: Home },
   { to: "/swap", label: "Swap", icon: ArrowLeftRight },
   { to: "/awareness", label: "Learn", icon: BookOpen },
+  { to: "/map", label: "PickPoint", icon: MapPin },
   { to: "/about", label: "About", icon: Info },
 ];
 

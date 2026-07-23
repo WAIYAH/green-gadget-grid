@@ -87,8 +87,8 @@ interface PickupCentre {
   id: string;
   name: string;
   address: string;
-  phone: string;
-  hours: string;
+  phone: string | null;
+  hours: string | null;
 }
 
 const iconForCategory = (category: string): typeof Laptop => {
@@ -261,12 +261,25 @@ const ProductCard = ({
 
         {/* Image/Icon area */}
         <div className="relative h-44 flex items-center justify-center overflow-hidden bg-gradient-to-b from-primary/5 to-transparent">
-          <motion.div
-            animate={hovered ? { scale: 1.15, rotate: 3 } : { scale: 1, rotate: 0 }}
-            transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] as const }}
-          >
-            <Icon className="w-20 h-20 text-primary/60" />
-          </motion.div>
+          {item.image && item.image !== "/placeholder.svg" ? (
+            <motion.img
+              src={item.image}
+              alt={item.name}
+              className="absolute inset-0 w-full h-full object-cover"
+              animate={hovered ? { scale: 1.1 } : { scale: 1 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] as const }}
+            />
+          ) : (
+            <motion.div
+              animate={hovered ? { scale: 1.15, rotate: 3 } : { scale: 1, rotate: 0 }}
+              transition={{ duration: 0.4, ease: [0.4, 0, 0.2, 1] as const }}
+            >
+              <Icon className="w-20 h-20 text-primary/60" />
+            </motion.div>
+          )}
+          {item.image && item.image !== "/placeholder.svg" && (
+            <div className="absolute inset-0 bg-gradient-to-t from-background/70 via-transparent to-transparent" />
+          )}
 
           {/* Condition badge */}
           <Badge className="absolute top-3 left-3 bg-primary/10 text-primary border-primary/20 text-xs capitalize">
@@ -387,17 +400,18 @@ const QuickViewModal = ({
       <DialogContent className="sm:max-w-2xl glass-lg border-border/30 p-0 overflow-hidden">
         <div className="grid md:grid-cols-2">
           {/* Left: Product visual */}
-          <div className="relative h-64 md:h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-transparent p-8">
-            <motion.div
-              animate={{ rotate: rotation }}
-              transition={{ duration: 0, ease: "linear" }}
-              className="relative"
-            >
-              <Icon className="w-32 h-32 text-primary/40" />
-            </motion.div>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 text-xs text-muted-foreground">
-              <RotateCw className="w-3 h-3 animate-spin" /> 360° view
-            </div>
+          <div className="relative h-64 md:h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-transparent overflow-hidden">
+            {item.image && item.image !== "/placeholder.svg" ? (
+              <img src={item.image} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <motion.div
+                animate={{ rotate: rotation }}
+                transition={{ duration: 0, ease: "linear" }}
+                className="relative"
+              >
+                <Icon className="w-32 h-32 text-primary/40" />
+              </motion.div>
+            )}
           </div>
 
           {/* Right: Info */}
@@ -498,7 +512,11 @@ const ComparisonModal = ({
           const Icon = item.icon;
           return (
             <div key={item.id} className="rounded-xl glass p-4 text-center">
-              <Icon className="w-12 h-12 text-primary/50 mx-auto mb-3" />
+              {item.image && item.image !== "/placeholder.svg" ? (
+                <img src={item.image} alt={item.name} className="w-16 h-16 rounded-lg object-cover mx-auto mb-3" />
+              ) : (
+                <Icon className="w-12 h-12 text-primary/50 mx-auto mb-3" />
+              )}
               <h4 className="font-bold text-sm mb-1">{item.name}</h4>
               <Badge className="mb-3 bg-primary/10 text-primary text-xs capitalize">{item.condition}</Badge>
               <div className="space-y-2 text-xs">
@@ -1166,7 +1184,7 @@ const Swap = () => {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">{centre.name}</p>
                         <p className="text-xs text-muted-foreground">{centre.address}</p>
-                        <p className="text-xs text-muted-foreground">{centre.hours}</p>
+                        {centre.hours && <p className="text-xs text-muted-foreground">{centre.hours}</p>}
                       </div>
                     </label>
                   ))}

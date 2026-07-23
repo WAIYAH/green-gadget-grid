@@ -422,28 +422,34 @@ export type Database = {
           active: boolean
           address: string
           created_at: string
-          hours: string
+          email: string | null
+          hours: string | null
           id: string
           name: string
-          phone: string
+          phone: string | null
+          website: string | null
         }
         Insert: {
           active?: boolean
           address: string
           created_at?: string
-          hours: string
+          email?: string | null
+          hours?: string | null
           id?: string
           name: string
-          phone: string
+          phone?: string | null
+          website?: string | null
         }
         Update: {
           active?: boolean
           address?: string
           created_at?: string
-          hours?: string
+          email?: string | null
+          hours?: string | null
           id?: string
           name?: string
-          phone?: string
+          phone?: string | null
+          website?: string | null
         }
         Relationships: []
       }

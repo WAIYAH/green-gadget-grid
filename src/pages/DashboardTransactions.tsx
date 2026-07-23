@@ -6,11 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Search, ArrowUpRight, ArrowDownRight, Loader2 } from "lucide-react";
+import { Download, Search, ArrowUpRight, ArrowDownRight, Loader2, Receipt as ReceiptIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import OrderReceipt from "@/components/OrderReceipt";
 
 type Transaction = Database["public"]["Tables"]["transactions"]["Row"];
 
@@ -26,6 +27,7 @@ const DashboardTransactions = () => {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("All");
+  const [receiptOrderId, setReceiptOrderId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -37,6 +39,13 @@ const DashboardTransactions = () => {
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Swap checkout is the only flow that stamps reference_id with an
+  // orders.id and prefixes the description with "Swap: " — that's how
+  // we tell "this transaction has a receipt" from every other type
+  // (gadget approvals, reward redemptions, quiz points, payouts).
+  const receiptOrderIdFor = (t: Transaction) =>
+    t.reference_id && (t.description || "").startsWith("Swap: ") ? t.reference_id : null;
 
   const filtered = tx.filter(
     (t) => (filter === "All" || t.type === filter.toLowerCase()) &&
@@ -120,28 +129,41 @@ const DashboardTransactions = () => {
                 <TableHead>Points</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Receipt</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell><Badge variant="outline" className="border-border/40 capitalize">{t.type}</Badge></TableCell>
-                  <TableCell className="text-foreground">{t.description || "-"}</TableCell>
-                  <TableCell className={`font-semibold ${t.points > 0 ? "text-primary" : t.points < 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                    {t.points > 0 ? "+" : ""}{t.points.toLocaleString()} pts
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell><Badge variant="outline" className={`capitalize ${statusColor[t.status] || ""}`}>{t.status}</Badge></TableCell>
-                </TableRow>
-              ))}
+              {filtered.map((t) => {
+                const orderId = receiptOrderIdFor(t);
+                return (
+                  <TableRow key={t.id}>
+                    <TableCell><Badge variant="outline" className="border-border/40 capitalize">{t.type}</Badge></TableCell>
+                    <TableCell className="text-foreground">{t.description || "-"}</TableCell>
+                    <TableCell className={`font-semibold ${t.points > 0 ? "text-primary" : t.points < 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                      {t.points > 0 ? "+" : ""}{t.points.toLocaleString()} pts
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{new Date(t.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell><Badge variant="outline" className={`capitalize ${statusColor[t.status] || ""}`}>{t.status}</Badge></TableCell>
+                    <TableCell className="text-right">
+                      {orderId && (
+                        <Button variant="ghost" size="sm" onClick={() => setReceiptOrderId(orderId)} className="h-7 text-xs text-muted-foreground hover:text-primary">
+                          <ReceiptIcon className="w-3.5 h-3.5 mr-1" /> View
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No transactions found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No transactions found.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </div>
         )}
       </Card>
+
+      <OrderReceipt orderId={receiptOrderId} open={!!receiptOrderId} onClose={() => setReceiptOrderId(null)} />
     </DashboardLayout>
   );
 };

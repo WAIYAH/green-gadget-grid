@@ -127,26 +127,36 @@ const DashboardLearning = () => {
               const status = statusFor(a.id);
               const score = progress[a.id]?.quiz_score;
               return (
-                <Card key={a.id} className="p-4 glass-hover flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <Badge variant="outline" className="text-[10px]">{a.category}</Badge>
-                    {status === "completed" ? (
-                      <Badge className="bg-primary/15 text-primary border-0 gap-1 text-[10px]"><CheckCircle2 className="w-3 h-3" /> Completed</Badge>
-                    ) : status === "in_progress" ? (
-                      <Badge className="bg-yellow-500/15 text-yellow-600 border-0 gap-1 text-[10px]"><PlayCircle className="w-3 h-3" /> In Progress</Badge>
-                    ) : (
-                      <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground"><Circle className="w-3 h-3" /> Not Started</Badge>
-                    )}
+                <Card key={a.id} className="glass-hover flex flex-col overflow-hidden group">
+                  <div className="relative h-36 overflow-hidden">
+                    <img
+                      src={a.thumbnail || "/placeholder.svg"}
+                      alt={a.title}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/10 to-transparent" />
+                    <Badge variant="outline" className="absolute top-3 left-3 text-[10px] bg-background/70 backdrop-blur-sm">{a.category}</Badge>
+                    <div className="absolute top-3 right-3">
+                      {status === "completed" ? (
+                        <Badge className="bg-primary/90 text-primary-foreground border-0 gap-1 text-[10px]"><CheckCircle2 className="w-3 h-3" /> Completed</Badge>
+                      ) : status === "in_progress" ? (
+                        <Badge className="bg-yellow-500/90 text-white border-0 gap-1 text-[10px]"><PlayCircle className="w-3 h-3" /> In Progress</Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1 text-[10px] bg-background/70 backdrop-blur-sm text-muted-foreground"><Circle className="w-3 h-3" /> Not Started</Badge>
+                      )}
+                    </div>
                   </div>
-                  <h3 className="font-bold text-foreground mb-1 line-clamp-2">{a.title}</h3>
-                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2 flex-1">{a.description}</p>
-                  <div className="flex items-center justify-between text-xs mb-3">
-                    <span className="flex items-center gap-1 text-accent font-medium"><Sparkles className="w-3.5 h-3.5" /> +{a.quiz_points} pts</span>
-                    {typeof score === "number" && <span className="text-muted-foreground">Best score: {score}%</span>}
+                  <div className="p-4 flex flex-col flex-1">
+                    <h3 className="font-bold text-foreground mb-1 line-clamp-2">{a.title}</h3>
+                    <p className="text-xs text-muted-foreground mb-3 line-clamp-2 flex-1">{a.description}</p>
+                    <div className="flex items-center justify-between text-xs mb-3">
+                      <span className="flex items-center gap-1 text-accent font-medium"><Sparkles className="w-3.5 h-3.5" /> +{a.quiz_points} pts</span>
+                      {typeof score === "number" && <span className="text-muted-foreground">Best score: {score}%</span>}
+                    </div>
+                    <Button size="sm" className="w-full bg-gradient-primary text-primary-foreground" onClick={() => navigate(`/dashboard/learning/${a.id}`)}>
+                      {status === "completed" ? "Review" : status === "in_progress" ? "Continue" : "Start Learning"}
+                    </Button>
                   </div>
-                  <Button size="sm" className="w-full bg-gradient-primary text-primary-foreground" onClick={() => navigate(`/dashboard/learning/${a.id}`)}>
-                    {status === "completed" ? "Review" : status === "in_progress" ? "Continue" : "Start Learning"}
-                  </Button>
                 </Card>
               );
             })}
@@ -159,13 +169,23 @@ const DashboardLearning = () => {
           <h2 className="text-lg font-bold mb-3">More to Read</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {readOnly.map((a) => (
-              <Card key={a.id} className="p-4 glass-hover flex flex-col">
-                <Badge variant="outline" className="text-[10px] w-fit mb-2">{a.category}</Badge>
-                <h3 className="font-bold text-foreground mb-1 line-clamp-2">{a.title}</h3>
-                <p className="text-xs text-muted-foreground mb-3 line-clamp-2 flex-1">{a.description}</p>
-                <Button size="sm" variant="outline" className="w-full" onClick={() => navigate(`/dashboard/learning/${a.id}`)}>
-                  Read
-                </Button>
+              <Card key={a.id} className="glass-hover flex flex-col overflow-hidden group">
+                <div className="relative h-36 overflow-hidden">
+                  <img
+                    src={a.thumbnail || "/placeholder.svg"}
+                    alt={a.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/10 to-transparent" />
+                  <Badge variant="outline" className="absolute top-3 left-3 text-[10px] bg-background/70 backdrop-blur-sm">{a.category}</Badge>
+                </div>
+                <div className="p-4 flex flex-col flex-1">
+                  <h3 className="font-bold text-foreground mb-1 line-clamp-2">{a.title}</h3>
+                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2 flex-1">{a.description}</p>
+                  <Button size="sm" variant="outline" className="w-full" onClick={() => navigate(`/dashboard/learning/${a.id}`)}>
+                    Read
+                  </Button>
+                </div>
               </Card>
             ))}
           </div>

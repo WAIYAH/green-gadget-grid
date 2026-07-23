@@ -112,17 +112,25 @@ const DashboardLearningDetail = () => {
         <ArrowLeft className="w-4 h-4" /> Back to Learning Center
       </Link>
 
-      <Card className="p-6 glass-lg border-border/30 mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Badge variant="outline" className="text-[10px]">{article.category}</Badge>
-          {questions.length > 0 && (
-            <Badge className="bg-accent/15 text-accent border-0 gap-1 text-[10px]"><Sparkles className="w-3 h-3" /> +{article.quiz_points} pts on completion</Badge>
-          )}
-        </div>
-        <h1 className="text-2xl font-bold text-foreground mb-2">{article.title}</h1>
-        <p className="text-sm text-muted-foreground mb-4">{article.description}</p>
-        <div className="prose prose-sm max-w-none text-foreground/90 whitespace-pre-wrap leading-relaxed">
-          {article.content}
+      <Card className="glass-lg border-border/30 mb-6 overflow-hidden">
+        {article.thumbnail && article.thumbnail !== "/placeholder.svg" && (
+          <div className="relative h-56 md:h-72 overflow-hidden">
+            <img src={article.thumbnail} alt={article.title} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/10 to-transparent" />
+          </div>
+        )}
+        <div className="p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Badge variant="outline" className="text-[10px]">{article.category}</Badge>
+            {questions.length > 0 && (
+              <Badge className="bg-accent/15 text-accent border-0 gap-1 text-[10px]"><Sparkles className="w-3 h-3" /> +{article.quiz_points} pts on completion</Badge>
+            )}
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">{article.title}</h1>
+          <p className="text-sm text-muted-foreground mb-4">{article.description}</p>
+          <div className="prose prose-sm max-w-none text-foreground/90 whitespace-pre-wrap leading-relaxed">
+            {article.content}
+          </div>
         </div>
       </Card>
 

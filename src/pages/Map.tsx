@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { MapPin, Phone, Clock, Navigation, Loader2 } from "lucide-react";
+import { MapPin, Phone, Clock, Navigation, Loader2, Mail, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -98,14 +98,32 @@ const Map = () => {
                         <MapPin className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
                         <span>{location.address}</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-primary" />
-                        <span>{location.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-primary" />
-                        <span>{location.hours}</span>
-                      </div>
+                      {location.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 text-primary" />
+                          <span>{location.phone}</span>
+                        </div>
+                      )}
+                      {location.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-primary" />
+                          <span>{location.email}</span>
+                        </div>
+                      )}
+                      {location.website && (
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-primary" />
+                          <a href={location.website} target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors truncate">
+                            {location.website.replace(/^https?:\/\//, "")}
+                          </a>
+                        </div>
+                      )}
+                      {location.hours && (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-primary" />
+                          <span>{location.hours}</span>
+                        </div>
+                      )}
                     </div>
                     <Button variant="outline" className="w-full mt-4">
                       <Navigation className="w-4 h-4 mr-2" />
